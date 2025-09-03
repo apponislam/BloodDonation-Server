@@ -6,10 +6,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
-const notFound_1 = __importDefault(require("./app/errors/notFound"));
-const globalErrorhandler_1 = __importDefault(require("./app/errors/globalErrorhandler"));
 const routes_1 = __importDefault(require("./app/routes"));
 const path_1 = __importDefault(require("path"));
+const notFound_1 = __importDefault(require("./errors/notFound"));
+const globalErrorhandler_1 = __importDefault(require("./errors/globalErrorhandler"));
 const app = (0, express_1.default)();
 const corsOptions = {
     origin: ["http://localhost:3000"],
@@ -23,9 +23,7 @@ app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 app.use((0, cookie_parser_1.default)());
 app.get("/", (req, res) => {
-    res.send({
-        message: "This is my server template",
-    });
+    res.sendFile(path_1.default.join(__dirname, "../public/index.html"));
 });
 app.use("/api/v1", routes_1.default);
 app.use(notFound_1.default);

@@ -13,10 +13,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const catchAsync_1 = __importDefault(require("../utils/catchAsync"));
+const catchAsync_1 = __importDefault(require("../../utils/catchAsync"));
 const config_1 = __importDefault(require("../config"));
-const ApiError_1 = __importDefault(require("../errors/ApiError"));
 const auth_model_1 = require("../modules/auth.model");
+const ApiError_1 = __importDefault(require("../../errors/ApiError"));
 const auth = (0, catchAsync_1.default)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     let token = req.headers.authorization;
     if (token === null || token === void 0 ? void 0 : token.startsWith("Bearer "))

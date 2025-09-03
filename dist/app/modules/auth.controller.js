@@ -13,12 +13,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authControllers = void 0;
-const catchAsync_1 = __importDefault(require("../utils/catchAsync"));
+const catchAsync_1 = __importDefault(require("../../utils/catchAsync"));
 const auth_services_1 = require("./auth.services");
 const http_status_1 = __importDefault(require("http-status"));
 const config_1 = __importDefault(require("../config"));
-const ApiError_1 = __importDefault(require("../errors/ApiError"));
-const sendResponse_1 = __importDefault(require("../utils/sendResponse."));
+const sendResponse_1 = __importDefault(require("../../utils/sendResponse."));
+const ApiError_1 = __importDefault(require("../../errors/ApiError"));
 const register = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield auth_services_1.authServices.registerUser(req, req.body);
     res.cookie("refreshToken", result.refreshToken, {

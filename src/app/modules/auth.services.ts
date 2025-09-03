@@ -3,22 +3,26 @@ import { LoginInput, RegisterInput } from "./auth.validation";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import httpStatus from "http-status";
-import ApiError from "../errors/ApiError";
-import { jwtHelper } from "../utils/jwtHelpers";
+import { jwtHelper } from "../../utils/jwtHelpers";
 import config from "../config";
+import ApiError from "../../errors/ApiError";
 
 const registerUser = async (req: any, data: RegisterInput) => {
     const existing = await UserModel.findOne({ email: data.email });
     if (existing) throw new ApiError(httpStatus.BAD_REQUEST, "Email already in use");
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
-    const profileImgUrl = req.file ? `/uploads/profile/${req.file.filename}` : undefined;
 
-    const user = await UserModel.create({
+    // Only add profileImg if file exists
+    const userData: any = {
         ...data,
         password: hashedPassword,
-        profileImg: profileImgUrl,
-    });
+    };
+    if (req.file) {
+        userData.profileImg = `/uploads/profile/${req.file.filename}`;
+    }
+
+    const user = await UserModel.create(userData);
 
     const jwtPayload = {
         _id: user._id,

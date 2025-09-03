@@ -1,12 +1,11 @@
 import { Router } from "express";
-import { uploadProfile } from "../middlewares/uploadProfile";
 import { authControllers } from "./auth.controller";
 import validateRequest from "../middlewares/validateRequest";
 import { loginSchema, registerSchema } from "./auth.validation";
-import { parseFormDataJson } from "../utils/parseFormData";
+import { handleFileOrJson } from "../../utils/handleFileOrJson";
 const router = Router();
 
-router.post("/register", uploadProfile.single("profile"), parseFormDataJson, validateRequest(registerSchema), authControllers.register);
+router.post("/register", handleFileOrJson({ fileField: "profile" }), validateRequest(registerSchema), authControllers.register);
 
 router.post("/login", validateRequest(loginSchema), authControllers.login);
 

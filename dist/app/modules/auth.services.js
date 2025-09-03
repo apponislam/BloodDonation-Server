@@ -28,16 +28,20 @@ const auth_model_1 = require("./auth.model");
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const http_status_1 = __importDefault(require("http-status"));
-const ApiError_1 = __importDefault(require("../errors/ApiError"));
-const jwtHelpers_1 = require("../utils/jwtHelpers");
+const jwtHelpers_1 = require("../../utils/jwtHelpers");
 const config_1 = __importDefault(require("../config"));
+const ApiError_1 = __importDefault(require("../../errors/ApiError"));
 const registerUser = (req, data) => __awaiter(void 0, void 0, void 0, function* () {
     const existing = yield auth_model_1.UserModel.findOne({ email: data.email });
     if (existing)
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Email already in use");
     const hashedPassword = yield bcrypt_1.default.hash(data.password, 10);
-    const profileImgUrl = req.file ? `/uploads/profile/${req.file.filename}` : undefined;
-    const user = yield auth_model_1.UserModel.create(Object.assign(Object.assign({}, data), { password: hashedPassword, profileImg: profileImgUrl }));
+    // Only add profileImg if file exists
+    const userData = Object.assign(Object.assign({}, data), { password: hashedPassword });
+    if (req.file) {
+        userData.profileImg = `/uploads/profile/${req.file.filename}`;
+    }
+    const user = yield auth_model_1.UserModel.create(userData);
     const jwtPayload = {
         _id: user._id,
         name: user.name,

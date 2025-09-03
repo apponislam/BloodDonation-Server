@@ -1,10 +1,10 @@
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import notFound from "./app/errors/notFound";
-import globalErrorHandler from "./app/errors/globalErrorhandler";
 import router from "./app/routes";
 import path from "path";
+import notFound from "./errors/notFound";
+import globalErrorHandler from "./errors/globalErrorhandler";
 
 const app: Application = express();
 
@@ -23,9 +23,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.get("/", (req: Request, res: Response) => {
-    res.send({
-        message: "This is my server template",
-    });
+    res.sendFile(path.join(__dirname, "../public/index.html"));
 });
 
 app.use("/api/v1", router);

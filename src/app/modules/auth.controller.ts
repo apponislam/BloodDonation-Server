@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
-import catchAsync from "../utils/catchAsync";
+import catchAsync from "../../utils/catchAsync";
 import { authServices } from "./auth.services";
 import httpStatus from "http-status";
 import config from "../config";
-import ApiError from "../errors/ApiError";
-import sendResponse from "../utils/sendResponse.";
+import sendResponse from "../../utils/sendResponse.";
+import ApiError from "../../errors/ApiError";
 
 const register = catchAsync(async (req: Request, res: Response) => {
     const result = await authServices.registerUser(req, req.body);
