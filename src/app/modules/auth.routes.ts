@@ -7,6 +7,7 @@ import passport from "../../utils/passport";
 const router = Router();
 
 router.post("/register", handleFileOrJson({ fileField: "profile" }), validateRequest(registerSchema), authControllers.register);
+router.get("/verify-email", authControllers.verifyEmailController);
 
 router.post("/login", validateRequest(loginSchema), authControllers.login);
 

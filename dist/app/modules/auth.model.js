@@ -47,6 +47,24 @@ const userSchema = new mongoose_1.Schema({
         },
         default: "email",
     },
+    isEmailVerified: {
+        type: Boolean,
+        default: function () {
+            return this.accountType === "email" ? false : undefined;
+        },
+    },
+    verificationToken: {
+        type: String,
+        default: function () {
+            return this.accountType === "email" ? undefined : undefined;
+        },
+    },
+    verificationTokenExpiry: {
+        type: Date,
+        default: function () {
+            return this.accountType === "email" ? undefined : undefined;
+        },
+    },
 }, {
     timestamps: true,
     versionKey: false,
@@ -59,6 +77,18 @@ const userSchema = new mongoose_1.Schema({
             return ret;
         },
     },
+});
+userSchema.pre("save", function (next) {
+    const user = this;
+    if (user.accountType !== "email") {
+        user.isEmailVerified = undefined;
+        user.verificationToken = undefined;
+        user.verificationTokenExpiry = undefined;
+    }
+    else if (user.isEmailVerified === undefined) {
+        user.isEmailVerified = false;
+    }
+    next();
 });
 // Remove password after save for safety
 userSchema.post("save", function (doc, next) {

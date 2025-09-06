@@ -35,6 +35,33 @@ const register = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+const verifyEmailController = catchAsync(async (req: Request, res: Response) => {
+    const { token, id } = req.query;
+
+    if (!token || !id) {
+        return sendResponse(res, {
+            statusCode: httpStatus.BAD_REQUEST,
+            success: false,
+            message: "Token and user ID are required",
+            data: null,
+        });
+    }
+
+    const user = await authServices.verifyEmailService(id as string, token as string);
+
+    return sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Email verified successfully",
+        data: {
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            isEmailVerified: user.isEmailVerified,
+        },
+    });
+});
+
 const login = catchAsync(async (req: Request, res: Response) => {
     const result = await authServices.loginUser(req.body);
 
@@ -159,6 +186,7 @@ const logout = catchAsync(async (req: Request, res: Response) => {
 
 export const authControllers = {
     register,
+    verifyEmailController,
     login,
     googleCallback,
     facebookCallback,

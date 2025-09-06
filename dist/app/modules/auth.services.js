@@ -31,6 +31,8 @@ const http_status_1 = __importDefault(require("http-status"));
 const jwtHelpers_1 = require("../../utils/jwtHelpers");
 const config_1 = __importDefault(require("../config"));
 const ApiError_1 = __importDefault(require("../../errors/ApiError"));
+const verificationToken_1 = require("../../utils/verificationToken");
+const emailVerifyMail_1 = require("../../shared/emailVerifyMail");
 const registerUser = (data) => __awaiter(void 0, void 0, void 0, function* () {
     const existing = yield auth_model_1.UserModel.findOne({ email: data.email });
     if (existing)
@@ -40,7 +42,17 @@ const registerUser = (data) => __awaiter(void 0, void 0, void 0, function* () {
         hashedPassword = yield bcrypt_1.default.hash(data.password, Number(config_1.default.bcrypt_salt_rounds));
     }
     const userData = Object.assign(Object.assign({}, data), { password: hashedPassword });
+    const { token, expiry } = (0, verificationToken_1.generateVerificationToken)(24); // 24 hours
+    userData.verificationToken = token;
+    userData.verificationTokenExpiry = expiry;
+    userData.isEmailVerified = false;
     const user = yield auth_model_1.UserModel.create(userData);
+    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${user.verificationToken}&id=${user._id}`;
+    yield (0, emailVerifyMail_1.sendVerificationEmail)({
+        to: user.email,
+        name: user.name,
+        verificationUrl,
+    });
     const jwtPayload = {
         _id: user._id,
         name: user.name,
@@ -56,6 +68,23 @@ const registerUser = (data) => __awaiter(void 0, void 0, void 0, function* () {
         accessToken,
         refreshToken,
     };
+});
+const verifyEmailService = (userId, token) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = yield auth_model_1.UserModel.findById(userId);
+    if (!user)
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
+    if (user.isEmailVerified)
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Email already verified");
+    if (user.verificationToken !== token)
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid token");
+    if (!user.verificationTokenExpiry || user.verificationTokenExpiry < new Date())
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Token expired");
+    // Mark email as verified and remove token
+    user.isEmailVerified = true;
+    user.verificationToken = undefined;
+    user.verificationTokenExpiry = undefined;
+    yield user.save();
+    return user;
 });
 const loginUser = (data) => __awaiter(void 0, void 0, void 0, function* () {
     const user = yield auth_model_1.UserModel.findOne({ email: data.email }).select("+password");
@@ -209,6 +238,7 @@ const refreshToken = (token) => __awaiter(void 0, void 0, void 0, function* () {
 });
 exports.authServices = {
     registerUser,
+    verifyEmailService,
     loginUser,
     handleGoogleLogin,
     handleFacebookLogin,

@@ -23,15 +23,23 @@ export const handleFileOrJson = (options: Options = {}) => {
         const contentType = req.headers["content-type"] || "";
 
         if (contentType.startsWith("multipart/form-data") && fileField) {
-            // Choose multer method based on single or multiple
             const uploadFn = multiple ? uploadProfile.array(fileField, maxCount) : uploadProfile.single(fileField);
 
             uploadFn(req, res, (err) => {
-                if (err) return next(err);
-                parseFormDataJson(jsonField)(req, res, next);
+                if (err) {
+                    console.error("File upload error:", err);
+                    return next(err);
+                }
+
+                // Check if JSON field exists and needs parsing - SAFELY
+                if (req.body && typeof req.body === "object" && req.body[jsonField] !== undefined) {
+                    parseFormDataJson(jsonField)(req, res, next);
+                } else {
+                    next();
+                }
             });
         } else {
-            // For raw JSON requests, skip multer
+            // For raw JSON or other content types, skip file processing
             next();
         }
     };

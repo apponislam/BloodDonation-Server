@@ -41,6 +41,29 @@ const register = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 
         },
     });
 }));
+const verifyEmailController = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { token, id } = req.query;
+    if (!token || !id) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.BAD_REQUEST,
+            success: false,
+            message: "Token and user ID are required",
+            data: null,
+        });
+    }
+    const user = yield auth_services_1.authServices.verifyEmailService(id, token);
+    return (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Email verified successfully",
+        data: {
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            isEmailVerified: user.isEmailVerified,
+        },
+    });
+}));
 const login = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield auth_services_1.authServices.loginUser(req.body);
     res.cookie("refreshToken", result.refreshToken, {
@@ -145,6 +168,7 @@ const logout = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0,
 }));
 exports.authControllers = {
     register,
+    verifyEmailController,
     login,
     googleCallback,
     facebookCallback,

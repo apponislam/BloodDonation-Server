@@ -17,6 +17,12 @@ export default {
     callback_url: process.env.CALLBACK_URL,
     facebook_app_id: process.env.FACEBOOK_APP_ID,
     facebook_app_secret: process.env.FACEBOOK_APP_SECRET,
+    mail: {
+        smtp_host: process.env.SMTP_HOST,
+        smtp_port: process.env.SMTP_PORT,
+        smtp_user: process.env.SMTP_USER,
+        smtp_pass: process.env.SMTP_PASS,
+    },
     // stripe_publishable_key: process.env.STRIPE_PUBLISHABLE_KEY,
     // stripe_secret_key: process.env.STRIPE_SECRET_KEY,
     // stripe_webhook_secret: process.env.STRIPE_WEBHOOK_SECRET,

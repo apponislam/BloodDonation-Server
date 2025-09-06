@@ -6,6 +6,8 @@ import httpStatus from "http-status";
 import { jwtHelper } from "../../utils/jwtHelpers";
 import config from "../config";
 import ApiError from "../../errors/ApiError";
+import { generateVerificationToken } from "../../utils/verificationToken";
+import { sendVerificationEmail } from "../../shared/emailVerifyMail";
 
 const registerUser = async (data: RegisterInput & { profileImg?: string }) => {
     const existing = await UserModel.findOne({ email: data.email });
@@ -21,7 +23,19 @@ const registerUser = async (data: RegisterInput & { profileImg?: string }) => {
         password: hashedPassword,
     };
 
+    const { token, expiry } = generateVerificationToken(24); // 24 hours
+    userData.verificationToken = token;
+    userData.verificationTokenExpiry = expiry;
+    userData.isEmailVerified = false;
+
     const user = await UserModel.create(userData);
+
+    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${user.verificationToken}&id=${user._id}`;
+    await sendVerificationEmail({
+        to: user.email,
+        name: user.name,
+        verificationUrl,
+    });
 
     const jwtPayload = {
         _id: user._id,
@@ -42,6 +56,24 @@ const registerUser = async (data: RegisterInput & { profileImg?: string }) => {
         accessToken,
         refreshToken,
     };
+};
+
+const verifyEmailService = async (userId: string, token: string) => {
+    const user = await UserModel.findById(userId);
+
+    if (!user) throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+    if (user.isEmailVerified) throw new ApiError(httpStatus.BAD_REQUEST, "Email already verified");
+    if (user.verificationToken !== token) throw new ApiError(httpStatus.BAD_REQUEST, "Invalid token");
+    if (!user.verificationTokenExpiry || user.verificationTokenExpiry < new Date()) throw new ApiError(httpStatus.BAD_REQUEST, "Token expired");
+
+    // Mark email as verified and remove token
+    user.isEmailVerified = true;
+    user.verificationToken = undefined;
+    user.verificationTokenExpiry = undefined;
+
+    await user.save();
+
+    return user;
 };
 
 const loginUser = async (data: LoginInput) => {
@@ -228,6 +260,7 @@ const refreshToken = async (token: string) => {
 
 export const authServices = {
     registerUser,
+    verifyEmailService,
     loginUser,
     handleGoogleLogin,
     handleFacebookLogin,

@@ -48,6 +48,25 @@ const userSchema = new Schema<IUser>(
             },
             default: "email",
         },
+
+        isEmailVerified: {
+            type: Boolean,
+            default: function (this: IUser) {
+                return this.accountType === "email" ? false : undefined;
+            },
+        },
+        verificationToken: {
+            type: String,
+            default: function (this: IUser) {
+                return this.accountType === "email" ? undefined : undefined;
+            },
+        },
+        verificationTokenExpiry: {
+            type: Date,
+            default: function (this: IUser) {
+                return this.accountType === "email" ? undefined : undefined;
+            },
+        },
     },
     {
         timestamps: true,
@@ -61,6 +80,18 @@ const userSchema = new Schema<IUser>(
         },
     }
 );
+
+userSchema.pre("save", function (next) {
+    const user = this as IUser;
+    if (user.accountType !== "email") {
+        user.isEmailVerified = undefined;
+        user.verificationToken = undefined;
+        user.verificationTokenExpiry = undefined;
+    } else if (user.isEmailVerified === undefined) {
+        user.isEmailVerified = false;
+    }
+    next();
+});
 
 // Remove password after save for safety
 userSchema.post("save", function (doc, next) {
