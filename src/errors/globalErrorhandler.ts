@@ -5,7 +5,7 @@ import handleValidationError from "./handleValidationError";
 import handleCastError from "./handleCastError";
 import handleDuplicateError from "./handleDuplicateError";
 import ApiError from "./ApiError";
-import { TErrorSources } from "../app/interface/error";
+import { TErrorSources } from "../app/interfaces/error";
 import config from "../app/config";
 
 const globalErrorHandler: ErrorRequestHandler = (err, req, res, next): void => {

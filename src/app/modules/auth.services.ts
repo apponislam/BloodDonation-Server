@@ -7,20 +7,19 @@ import { jwtHelper } from "../../utils/jwtHelpers";
 import config from "../config";
 import ApiError from "../../errors/ApiError";
 
-const registerUser = async (req: any, data: RegisterInput) => {
+const registerUser = async (data: RegisterInput & { profileImg?: string }) => {
     const existing = await UserModel.findOne({ email: data.email });
     if (existing) throw new ApiError(httpStatus.BAD_REQUEST, "Email already in use");
 
-    const hashedPassword = await bcrypt.hash(data.password, 10);
+    let hashedPassword: string | undefined = undefined;
+    if (data.password) {
+        hashedPassword = await bcrypt.hash(data.password, Number(config.bcrypt_salt_rounds));
+    }
 
-    // Only add profileImg if file exists
     const userData: any = {
         ...data,
         password: hashedPassword,
     };
-    if (req.file) {
-        userData.profileImg = `/uploads/profile/${req.file.filename}`;
-    }
 
     const user = await UserModel.create(userData);
 
@@ -36,7 +35,6 @@ const registerUser = async (req: any, data: RegisterInput) => {
 
     const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret as string, config.jwt_refresh_expire as string);
 
-    // Remove password from response
     const { password, ...userWithoutPassword } = user.toObject();
 
     return {
@@ -68,7 +66,6 @@ const loginUser = async (data: LoginInput) => {
 
     const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret as string, config.jwt_refresh_expire as string);
 
-    // Remove password from response
     const { password, ...userWithoutPassword } = user.toObject();
 
     return {
@@ -76,6 +73,121 @@ const loginUser = async (data: LoginInput) => {
         accessToken,
         refreshToken,
     };
+};
+
+const handleGoogleLogin = async (profile: any) => {
+    const email = profile.emails?.[0]?.value;
+    if (!email) throw new Error("Google profile does not contain email");
+
+    let user = await UserModel.findOne({ email });
+
+    if (!user) {
+        user = await UserModel.create({
+            name: profile.displayName,
+            email,
+            profileImg: profile.photos?.[0]?.value,
+            role: "user",
+            isActive: true,
+            lastLogin: new Date(),
+            accountType: "google",
+        });
+    } else {
+        user.lastLogin = new Date();
+        await user.save();
+    }
+
+    const jwtPayload = {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        profileImg: user.profileImg,
+        role: user.role,
+    };
+
+    const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret as string, config.jwt_access_expire as string);
+
+    const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret as string, config.jwt_refresh_expire as string);
+
+    return { user, accessToken, refreshToken };
+};
+
+const handleFacebookLogin = async (profile: any) => {
+    const email = profile.emails?.[0]?.value;
+
+    if (!email) {
+        // Return profile info so frontend can ask for email
+        return {
+            requiresEmail: true,
+            profile: {
+                name: profile.displayName,
+                profileImg: profile.photos?.[0]?.value,
+            },
+        };
+    }
+
+    let user = await UserModel.findOne({ email });
+
+    if (!user) {
+        user = await UserModel.create({
+            name: profile.displayName,
+            email,
+            password: "", // empty because accountType != "email"
+            profileImg: profile.photos?.[0]?.value,
+            role: "user",
+            isActive: true,
+            accountType: "facebook",
+            lastLogin: new Date(),
+        });
+    } else {
+        user.lastLogin = new Date();
+        await user.save();
+    }
+
+    const jwtPayload = {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        profileImg: user.profileImg,
+        role: user.role,
+    };
+
+    const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret!, config.jwt_access_expire!);
+    const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret!, config.jwt_refresh_expire!);
+
+    return { user, accessToken, refreshToken };
+};
+
+const completeFacebookLoginWithEmail = async (profile: any, email: string) => {
+    let user = await UserModel.findOne({ email });
+
+    if (!user) {
+        user = await UserModel.create({
+            name: profile.name,
+            email,
+            password: "",
+            profileImg: profile.profileImg,
+            role: "user",
+            isActive: true,
+            accountType: "facebook",
+            lastLogin: new Date(),
+        });
+    } else {
+        user.lastLogin = new Date();
+        await user.save();
+    }
+
+    const jwtPayload = {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        profileImg: user.profileImg,
+        role: user.role,
+    };
+
+    const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret!, config.jwt_access_expire!);
+    const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret!, config.jwt_refresh_expire!);
+
+    return { user, accessToken, refreshToken };
 };
 
 const refreshToken = async (token: string) => {
@@ -117,5 +229,8 @@ const refreshToken = async (token: string) => {
 export const authServices = {
     registerUser,
     loginUser,
+    handleGoogleLogin,
+    handleFacebookLogin,
+    completeFacebookLoginWithEmail,
     refreshToken,
 };

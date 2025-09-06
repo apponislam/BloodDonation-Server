@@ -7,13 +7,20 @@ import sendResponse from "../../utils/sendResponse.";
 import ApiError from "../../errors/ApiError";
 
 const register = catchAsync(async (req: Request, res: Response) => {
-    const result = await authServices.registerUser(req, req.body);
+    // Handle profile image if uploaded
+    const profileImg = req.file ? `/uploads/profile/${req.file.filename}` : undefined;
 
+    const result = await authServices.registerUser({
+        ...req.body,
+        profileImg,
+    });
+
+    // Set refresh token in cookie
     res.cookie("refreshToken", result.refreshToken, {
         httpOnly: true,
         secure: config.node_env === "production",
         sameSite: "strict",
-        maxAge: 30 * 24 * 60 * 60 * 1000,
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     });
 
     sendResponse(res, {
@@ -47,6 +54,71 @@ const login = catchAsync(async (req: Request, res: Response) => {
             accessToken: result.accessToken,
             refreshToken: result.refreshToken,
         },
+    });
+});
+
+const googleCallback = catchAsync(async (req: Request, res: Response) => {
+    const { user, accessToken, refreshToken } = req.user as any;
+
+    res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    res.status(200).json({
+        success: true,
+        message: "Google login successful",
+        data: {
+            user,
+            accessToken,
+            refreshToken,
+        },
+    });
+});
+
+const facebookCallback = catchAsync(async (req: Request, res: Response) => {
+    const result = req.user as any;
+
+    if (result.requiresEmail) {
+        return res.status(200).json({
+            success: true,
+            message: "Facebook login requires email",
+            data: result,
+        });
+    }
+
+    const { user, accessToken, refreshToken } = result;
+
+    res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    sendResponse(res, {
+        statusCode: 200,
+        success: true,
+        message: "Facebook login successful",
+        data: { user, accessToken, refreshToken },
+    });
+});
+
+const facebookComplete = catchAsync(async (req: Request, res: Response) => {
+    const { email, profile } = req.body;
+
+    if (!email) throw new Error("Email is required to complete Facebook login");
+
+    // Complete login using temporary profile + email
+    const result = await authServices.completeFacebookLoginWithEmail(profile, email);
+
+    sendResponse(res, {
+        statusCode: 200,
+        success: true,
+        message: "Facebook login completed successfully",
+        data: result,
     });
 });
 
@@ -88,6 +160,9 @@ const logout = catchAsync(async (req: Request, res: Response) => {
 export const authControllers = {
     register,
     login,
+    googleCallback,
+    facebookCallback,
+    facebookComplete,
     refreshAccessToken,
     logout,
 };

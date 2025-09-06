@@ -31,16 +31,15 @@ const http_status_1 = __importDefault(require("http-status"));
 const jwtHelpers_1 = require("../../utils/jwtHelpers");
 const config_1 = __importDefault(require("../config"));
 const ApiError_1 = __importDefault(require("../../errors/ApiError"));
-const registerUser = (req, data) => __awaiter(void 0, void 0, void 0, function* () {
+const registerUser = (data) => __awaiter(void 0, void 0, void 0, function* () {
     const existing = yield auth_model_1.UserModel.findOne({ email: data.email });
     if (existing)
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Email already in use");
-    const hashedPassword = yield bcrypt_1.default.hash(data.password, 10);
-    // Only add profileImg if file exists
-    const userData = Object.assign(Object.assign({}, data), { password: hashedPassword });
-    if (req.file) {
-        userData.profileImg = `/uploads/profile/${req.file.filename}`;
+    let hashedPassword = undefined;
+    if (data.password) {
+        hashedPassword = yield bcrypt_1.default.hash(data.password, Number(config_1.default.bcrypt_salt_rounds));
     }
+    const userData = Object.assign(Object.assign({}, data), { password: hashedPassword });
     const user = yield auth_model_1.UserModel.create(userData);
     const jwtPayload = {
         _id: user._id,
@@ -51,7 +50,6 @@ const registerUser = (req, data) => __awaiter(void 0, void 0, void 0, function* 
     };
     const accessToken = jwtHelpers_1.jwtHelper.generateToken(jwtPayload, config_1.default.jwt_access_secret, config_1.default.jwt_access_expire);
     const refreshToken = jwtHelpers_1.jwtHelper.generateToken(jwtPayload, config_1.default.jwt_refresh_secret, config_1.default.jwt_refresh_expire);
-    // Remove password from response
     const _a = user.toObject(), { password } = _a, userWithoutPassword = __rest(_a, ["password"]);
     return {
         user: userWithoutPassword,
@@ -77,13 +75,114 @@ const loginUser = (data) => __awaiter(void 0, void 0, void 0, function* () {
     };
     const accessToken = jwtHelpers_1.jwtHelper.generateToken(jwtPayload, config_1.default.jwt_access_secret, config_1.default.jwt_access_expire);
     const refreshToken = jwtHelpers_1.jwtHelper.generateToken(jwtPayload, config_1.default.jwt_refresh_secret, config_1.default.jwt_refresh_expire);
-    // Remove password from response
     const _a = user.toObject(), { password } = _a, userWithoutPassword = __rest(_a, ["password"]);
     return {
         user: userWithoutPassword,
         accessToken,
         refreshToken,
     };
+});
+const handleGoogleLogin = (profile) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d;
+    const email = (_b = (_a = profile.emails) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.value;
+    if (!email)
+        throw new Error("Google profile does not contain email");
+    let user = yield auth_model_1.UserModel.findOne({ email });
+    if (!user) {
+        user = yield auth_model_1.UserModel.create({
+            name: profile.displayName,
+            email,
+            profileImg: (_d = (_c = profile.photos) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.value,
+            role: "user",
+            isActive: true,
+            lastLogin: new Date(),
+            accountType: "google",
+        });
+    }
+    else {
+        user.lastLogin = new Date();
+        yield user.save();
+    }
+    const jwtPayload = {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        profileImg: user.profileImg,
+        role: user.role,
+    };
+    const accessToken = jwtHelpers_1.jwtHelper.generateToken(jwtPayload, config_1.default.jwt_access_secret, config_1.default.jwt_access_expire);
+    const refreshToken = jwtHelpers_1.jwtHelper.generateToken(jwtPayload, config_1.default.jwt_refresh_secret, config_1.default.jwt_refresh_expire);
+    return { user, accessToken, refreshToken };
+});
+const handleFacebookLogin = (profile) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f;
+    const email = (_b = (_a = profile.emails) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.value;
+    if (!email) {
+        // Return profile info so frontend can ask for email
+        return {
+            requiresEmail: true,
+            profile: {
+                name: profile.displayName,
+                profileImg: (_d = (_c = profile.photos) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.value,
+            },
+        };
+    }
+    let user = yield auth_model_1.UserModel.findOne({ email });
+    if (!user) {
+        user = yield auth_model_1.UserModel.create({
+            name: profile.displayName,
+            email,
+            password: "", // empty because accountType != "email"
+            profileImg: (_f = (_e = profile.photos) === null || _e === void 0 ? void 0 : _e[0]) === null || _f === void 0 ? void 0 : _f.value,
+            role: "user",
+            isActive: true,
+            accountType: "facebook",
+            lastLogin: new Date(),
+        });
+    }
+    else {
+        user.lastLogin = new Date();
+        yield user.save();
+    }
+    const jwtPayload = {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        profileImg: user.profileImg,
+        role: user.role,
+    };
+    const accessToken = jwtHelpers_1.jwtHelper.generateToken(jwtPayload, config_1.default.jwt_access_secret, config_1.default.jwt_access_expire);
+    const refreshToken = jwtHelpers_1.jwtHelper.generateToken(jwtPayload, config_1.default.jwt_refresh_secret, config_1.default.jwt_refresh_expire);
+    return { user, accessToken, refreshToken };
+});
+const completeFacebookLoginWithEmail = (profile, email) => __awaiter(void 0, void 0, void 0, function* () {
+    let user = yield auth_model_1.UserModel.findOne({ email });
+    if (!user) {
+        user = yield auth_model_1.UserModel.create({
+            name: profile.name,
+            email,
+            password: "",
+            profileImg: profile.profileImg,
+            role: "user",
+            isActive: true,
+            accountType: "facebook",
+            lastLogin: new Date(),
+        });
+    }
+    else {
+        user.lastLogin = new Date();
+        yield user.save();
+    }
+    const jwtPayload = {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        profileImg: user.profileImg,
+        role: user.role,
+    };
+    const accessToken = jwtHelpers_1.jwtHelper.generateToken(jwtPayload, config_1.default.jwt_access_secret, config_1.default.jwt_access_expire);
+    const refreshToken = jwtHelpers_1.jwtHelper.generateToken(jwtPayload, config_1.default.jwt_refresh_secret, config_1.default.jwt_refresh_expire);
+    return { user, accessToken, refreshToken };
 });
 const refreshToken = (token) => __awaiter(void 0, void 0, void 0, function* () {
     if (!token) {
@@ -111,5 +210,8 @@ const refreshToken = (token) => __awaiter(void 0, void 0, void 0, function* () {
 exports.authServices = {
     registerUser,
     loginUser,
+    handleGoogleLogin,
+    handleFacebookLogin,
+    completeFacebookLoginWithEmail,
     refreshToken,
 };
