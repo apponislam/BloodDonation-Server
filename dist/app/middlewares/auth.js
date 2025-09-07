@@ -15,7 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const catchAsync_1 = __importDefault(require("../../utils/catchAsync"));
 const config_1 = __importDefault(require("../config"));
-const auth_model_1 = require("../modules/auth.model");
+const auth_model_1 = require("../modules/auth/auth.model");
 const ApiError_1 = __importDefault(require("../../errors/ApiError"));
 const auth = (0, catchAsync_1.default)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     let token = req.headers.authorization;

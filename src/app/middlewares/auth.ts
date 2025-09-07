@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 import catchAsync from "../../utils/catchAsync";
 import config from "../config";
-import { UserModel } from "../modules/auth.model";
+import { UserModel } from "../modules/auth/auth.model";
 import ApiError from "../../errors/ApiError";
 
 const auth = catchAsync(async (req: Request, res: Response, next: NextFunction) => {

@@ -2,7 +2,7 @@ import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as FacebookStrategy } from "passport-facebook";
 import config from "../app/config";
-import { authServices } from "../app/modules/auth.services";
+import { authServices } from "../app/modules/auth/auth.services";
 
 // --- GOOGLE ---
 passport.use(

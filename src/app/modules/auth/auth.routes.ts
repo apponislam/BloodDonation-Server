@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { authControllers } from "./auth.controller";
-import validateRequest from "../middlewares/validateRequest";
+import validateRequest from "../../middlewares/validateRequest";
 import { loginSchema, registerSchema } from "./auth.validation";
-import { handleFileOrJson } from "../../utils/handleFileOrJson";
-import passport from "../../utils/passport";
-import auth from "../middlewares/auth";
+import { handleFileOrJson } from "../../../utils/handleFileOrJson";
+import passport from "../../../utils/passport";
+import auth from "../../middlewares/auth";
 const router = Router();
 
 router.post("/register", handleFileOrJson({ fileField: "profile" }), validateRequest(registerSchema), authControllers.register);

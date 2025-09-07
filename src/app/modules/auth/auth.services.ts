@@ -3,12 +3,12 @@ import { LoginInput, RegisterInput } from "./auth.validation";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import httpStatus from "http-status";
-import { jwtHelper } from "../../utils/jwtHelpers";
-import config from "../config";
-import ApiError from "../../errors/ApiError";
-import { generateOtp, generateVerificationToken } from "../../utils/tokenGenerator";
-import { sendVerificationEmail } from "../../shared/emailVerifyMail";
-import { sendOtpEmail } from "../../shared/sendOtpEmail";
+import { jwtHelper } from "../../../utils/jwtHelpers";
+import config from "../../config";
+import ApiError from "../../../errors/ApiError";
+import { generateOtp, generateVerificationToken } from "../../../utils/tokenGenerator";
+import { sendVerificationEmail } from "../../../shared/emailVerifyMail";
+import { sendOtpEmail } from "../../../shared/sendOtpEmail";
 import { Types } from "mongoose";
 
 const registerUser = async (data: RegisterInput & { profileImg?: string }) => {

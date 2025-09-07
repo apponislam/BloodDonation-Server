@@ -16,7 +16,7 @@ const passport_1 = __importDefault(require("passport"));
 const passport_google_oauth20_1 = require("passport-google-oauth20");
 const passport_facebook_1 = require("passport-facebook");
 const config_1 = __importDefault(require("../app/config"));
-const auth_services_1 = require("../app/modules/auth.services");
+const auth_services_1 = require("../app/modules/auth/auth.services");
 // --- GOOGLE ---
 passport_1.default.use(new passport_google_oauth20_1.Strategy({
     clientID: config_1.default.google_client_id,
