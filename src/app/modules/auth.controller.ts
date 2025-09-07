@@ -35,6 +35,28 @@ const register = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+const resendVerifyEmailController = catchAsync(async (req: Request, res: Response) => {
+    const { id } = req.body;
+
+    if (!id) {
+        return sendResponse(res, {
+            statusCode: httpStatus.BAD_REQUEST,
+            success: false,
+            message: "User ID is required",
+            data: null,
+        });
+    }
+
+    const result = await authServices.resendVerificationEmailService(id);
+
+    return sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Verification email resent successfully",
+        data: result,
+    });
+});
+
 const verifyEmailController = catchAsync(async (req: Request, res: Response) => {
     const { token, id } = req.query;
 
@@ -84,6 +106,7 @@ const login = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+// --- GOOGLE CALLBACK ---
 const googleCallback = catchAsync(async (req: Request, res: Response) => {
     const { user, accessToken, refreshToken } = req.user as any;
 
@@ -94,22 +117,21 @@ const googleCallback = catchAsync(async (req: Request, res: Response) => {
         maxAge: 30 * 24 * 60 * 60 * 1000,
     });
 
-    res.status(200).json({
+    sendResponse(res, {
+        statusCode: 200,
         success: true,
         message: "Google login successful",
-        data: {
-            user,
-            accessToken,
-            refreshToken,
-        },
+        data: { user, accessToken, refreshToken },
     });
 });
 
+// --- FACEBOOK CALLBACK ---
 const facebookCallback = catchAsync(async (req: Request, res: Response) => {
     const result = req.user as any;
 
     if (result.requiresEmail) {
-        return res.status(200).json({
+        return sendResponse(res, {
+            statusCode: 200,
             success: true,
             message: "Facebook login requires email",
             data: result,
@@ -133,12 +155,11 @@ const facebookCallback = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+// --- COMPLETE FACEBOOK LOGIN ---
 const facebookComplete = catchAsync(async (req: Request, res: Response) => {
     const { email, profile } = req.body;
-
     if (!email) throw new Error("Email is required to complete Facebook login");
 
-    // Complete login using temporary profile + email
     const result = await authServices.completeFacebookLoginWithEmail(profile, email);
 
     sendResponse(res, {
@@ -146,6 +167,26 @@ const facebookComplete = catchAsync(async (req: Request, res: Response) => {
         success: true,
         message: "Facebook login completed successfully",
         data: result,
+    });
+});
+
+const getMeController = catchAsync(async (req: Request, res: Response) => {
+    if (!req.user?._id) {
+        return sendResponse(res, {
+            statusCode: httpStatus.UNAUTHORIZED,
+            success: false,
+            message: "User not authenticated",
+            data: null,
+        });
+    }
+
+    const user = await authServices.getMeService(req.user._id);
+
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "User info retrieved successfully",
+        data: user,
     });
 });
 
@@ -196,6 +237,18 @@ const requestPasswordResetOtpController = catchAsync(async (req: Request, res: R
     });
 });
 
+const resendPasswordResetOtpController = catchAsync(async (req: Request, res: Response) => {
+    const { email } = req.body;
+    const result = await authServices.resendPasswordResetOtp(email);
+
+    return sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: result.message,
+        data: null,
+    });
+});
+
 const resetPasswordWithOtpController = catchAsync(async (req: Request, res: Response) => {
     const { email, otp, newPassword } = req.body;
     const result = await authServices.resetPasswordWithOtp(email, otp, newPassword);
@@ -208,15 +261,44 @@ const resetPasswordWithOtpController = catchAsync(async (req: Request, res: Resp
     });
 });
 
+const changePasswordController = catchAsync(async (req: Request, res: Response) => {
+    const userId = req.user?._id;
+    const { currentPassword, newPassword } = req.body;
+
+    console.log(userId);
+
+    if (!userId) {
+        return sendResponse(res, {
+            statusCode: httpStatus.UNAUTHORIZED,
+            success: false,
+            message: "Unauthorized",
+            data: null,
+        });
+    }
+
+    const result = await authServices.changePassword(userId, currentPassword, newPassword);
+
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: result.message,
+        data: null,
+    });
+});
+
 export const authControllers = {
     register,
+    resendVerifyEmailController,
     verifyEmailController,
     login,
     googleCallback,
     facebookCallback,
     facebookComplete,
+    getMeController,
     refreshAccessToken,
     logout,
     requestPasswordResetOtpController,
+    resendPasswordResetOtpController,
     resetPasswordWithOtpController,
+    changePasswordController,
 };

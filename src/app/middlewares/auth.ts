@@ -30,6 +30,9 @@ const auth = catchAsync(async (req: Request, res: Response, next: NextFunction) 
         throw new ApiError(404, "Authentication failed: User not found");
     }
 
+    // console.log(user);
+    // console.log(decoded);
+
     req.user = user;
     next();
 });

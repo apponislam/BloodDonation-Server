@@ -17,6 +17,7 @@ const passport_google_oauth20_1 = require("passport-google-oauth20");
 const passport_facebook_1 = require("passport-facebook");
 const config_1 = __importDefault(require("../app/config"));
 const auth_services_1 = require("../app/modules/auth.services");
+// --- GOOGLE ---
 passport_1.default.use(new passport_google_oauth20_1.Strategy({
     clientID: config_1.default.google_client_id,
     clientSecret: config_1.default.google_client_secret,
@@ -24,7 +25,11 @@ passport_1.default.use(new passport_google_oauth20_1.Strategy({
 }, (accessToken, refreshToken, profile, done) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const result = yield auth_services_1.authServices.handleGoogleLogin(profile);
-        return done(null, result);
+        const userWithTokens = Object.assign(result.user.toObject(), {
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+        });
+        return done(null, userWithTokens);
     }
     catch (error) {
         return done(error, false);

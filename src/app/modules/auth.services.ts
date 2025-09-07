@@ -9,6 +9,7 @@ import ApiError from "../../errors/ApiError";
 import { generateOtp, generateVerificationToken } from "../../utils/tokenGenerator";
 import { sendVerificationEmail } from "../../shared/emailVerifyMail";
 import { sendOtpEmail } from "../../shared/sendOtpEmail";
+import { Types } from "mongoose";
 
 const registerUser = async (data: RegisterInput & { profileImg?: string }) => {
     const existing = await UserModel.findOne({ email: data.email });
@@ -57,6 +58,32 @@ const registerUser = async (data: RegisterInput & { profileImg?: string }) => {
         accessToken,
         refreshToken,
     };
+};
+
+const resendVerificationEmailService = async (userId: string) => {
+    const user = await UserModel.findById(userId);
+
+    if (!user) throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+    if (user.isEmailVerified) throw new ApiError(httpStatus.BAD_REQUEST, "Email already verified");
+
+    // Generate new token
+    const { token, expiry } = generateVerificationToken();
+
+    user.verificationToken = token;
+    user.verificationTokenExpiry = expiry;
+    await user.save();
+
+    // Build verification URL
+    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}&id=${user._id}`;
+
+    // Send email
+    await sendVerificationEmail({
+        to: user.email,
+        name: user.name,
+        verificationUrl,
+    });
+
+    return { email: user.email, sent: true };
 };
 
 const verifyEmailService = async (userId: string, token: string) => {
@@ -108,9 +135,10 @@ const loginUser = async (data: LoginInput) => {
     };
 };
 
+// --- GOOGLE LOGIN ---
 const handleGoogleLogin = async (profile: any) => {
     const email = profile.emails?.[0]?.value;
-    if (!email) throw new Error("Google profile does not contain email");
+    if (!email) throw new ApiError(httpStatus.BAD_REQUEST, "Google profile does not contain email");
 
     let user = await UserModel.findOne({ email });
 
@@ -137,18 +165,17 @@ const handleGoogleLogin = async (profile: any) => {
         role: user.role,
     };
 
-    const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret as string, config.jwt_access_expire as string);
-
-    const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret as string, config.jwt_refresh_expire as string);
+    const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret!, config.jwt_access_expire!);
+    const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret!, config.jwt_refresh_expire!);
 
     return { user, accessToken, refreshToken };
 };
 
+// --- FACEBOOK LOGIN ---
 const handleFacebookLogin = async (profile: any) => {
     const email = profile.emails?.[0]?.value;
 
     if (!email) {
-        // Return profile info so frontend can ask for email
         return {
             requiresEmail: true,
             profile: {
@@ -164,7 +191,7 @@ const handleFacebookLogin = async (profile: any) => {
         user = await UserModel.create({
             name: profile.displayName,
             email,
-            password: "", // empty because accountType != "email"
+            password: "",
             profileImg: profile.photos?.[0]?.value,
             role: "user",
             isActive: true,
@@ -190,6 +217,7 @@ const handleFacebookLogin = async (profile: any) => {
     return { user, accessToken, refreshToken };
 };
 
+// --- COMPLETE FACEBOOK LOGIN ---
 const completeFacebookLoginWithEmail = async (profile: any, email: string) => {
     let user = await UserModel.findOne({ email });
 
@@ -221,6 +249,15 @@ const completeFacebookLoginWithEmail = async (profile: any, email: string) => {
     const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret!, config.jwt_refresh_expire!);
 
     return { user, accessToken, refreshToken };
+};
+
+const getMeService = async (userId: string | Types.ObjectId) => {
+    const _id = typeof userId === "string" ? new Types.ObjectId(userId) : userId;
+    const user = await UserModel.findById(_id).select("-password -resetPasswordOtp -resetPasswordOtpExpiry");
+    if (!user) {
+        throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+    }
+    return user;
 };
 
 const refreshToken = async (token: string) => {
@@ -274,6 +311,21 @@ const requestPasswordResetOtp = async (email: string) => {
     return { message: "OTP sent to email" };
 };
 
+const resendPasswordResetOtp = async (email: string) => {
+    const user = await UserModel.findOne({ email });
+    if (!user) throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+
+    const { otp, expiry } = generateOtp();
+
+    user.resetPasswordOtp = otp;
+    user.resetPasswordOtpExpiry = expiry;
+    await user.save();
+
+    await sendOtpEmail({ to: user.email, name: user.name, otp });
+
+    return { message: "OTP resent to email" };
+};
+
 const resetPasswordWithOtp = async (email: string, otp: string, newPassword: string) => {
     const user = await UserModel.findOne({ email });
     if (!user) throw new ApiError(httpStatus.NOT_FOUND, "User not found");
@@ -295,14 +347,35 @@ const resetPasswordWithOtp = async (email: string, otp: string, newPassword: str
     return { message: "Password reset successful" };
 };
 
+const changePassword = async (userId: Types.ObjectId, currentPassword: string, newPassword: string) => {
+    const user = await UserModel.findById(userId).select("+password");
+    if (!user) throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+
+    // Validate current password
+    const isPasswordCorrect = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordCorrect) {
+        throw new ApiError(httpStatus.BAD_REQUEST, "Current password is incorrect");
+    }
+
+    // Hash and save new password
+    user.password = await bcrypt.hash(newPassword, Number(config.bcrypt_salt_rounds));
+    await user.save();
+
+    return { message: "Password changed successfully" };
+};
+
 export const authServices = {
     registerUser,
+    resendVerificationEmailService,
     verifyEmailService,
     loginUser,
     handleGoogleLogin,
     handleFacebookLogin,
     completeFacebookLoginWithEmail,
+    getMeService,
     refreshToken,
     requestPasswordResetOtp,
+    resendPasswordResetOtp,
     resetPasswordWithOtp,
+    changePassword,
 };

@@ -4,17 +4,24 @@ import { Strategy as FacebookStrategy } from "passport-facebook";
 import config from "../app/config";
 import { authServices } from "../app/modules/auth.services";
 
+// --- GOOGLE ---
 passport.use(
     new GoogleStrategy(
         {
-            clientID: config.google_client_id as string,
-            clientSecret: config.google_client_secret as string,
+            clientID: config.google_client_id!,
+            clientSecret: config.google_client_secret!,
             callbackURL: `${config.callback_url}/api/v1/auth/google/callback`,
         },
         async (accessToken, refreshToken, profile, done) => {
             try {
                 const result = await authServices.handleGoogleLogin(profile);
-                return done(null, result);
+
+                const userWithTokens = Object.assign(result.user.toObject(), {
+                    accessToken: result.accessToken,
+                    refreshToken: result.refreshToken,
+                });
+
+                return done(null, userWithTokens);
             } catch (error) {
                 return done(error, false);
             }

@@ -41,6 +41,24 @@ const register = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 
         },
     });
 }));
+const resendVerifyEmailController = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.body;
+    if (!id) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.BAD_REQUEST,
+            success: false,
+            message: "User ID is required",
+            data: null,
+        });
+    }
+    const result = yield auth_services_1.authServices.resendVerificationEmailService(id);
+    return (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Verification email resent successfully",
+        data: result,
+    });
+}));
 const verifyEmailController = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { token, id } = req.query;
     if (!token || !id) {
@@ -83,6 +101,7 @@ const login = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, 
         },
     });
 }));
+// --- GOOGLE CALLBACK ---
 const googleCallback = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { user, accessToken, refreshToken } = req.user;
     res.cookie("refreshToken", refreshToken, {
@@ -91,20 +110,19 @@ const googleCallback = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
         sameSite: "strict",
         maxAge: 30 * 24 * 60 * 60 * 1000,
     });
-    res.status(200).json({
+    (0, sendResponse_1.default)(res, {
+        statusCode: 200,
         success: true,
         message: "Google login successful",
-        data: {
-            user,
-            accessToken,
-            refreshToken,
-        },
+        data: { user, accessToken, refreshToken },
     });
 }));
+// --- FACEBOOK CALLBACK ---
 const facebookCallback = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const result = req.user;
     if (result.requiresEmail) {
-        return res.status(200).json({
+        return (0, sendResponse_1.default)(res, {
+            statusCode: 200,
             success: true,
             message: "Facebook login requires email",
             data: result,
@@ -124,17 +142,35 @@ const facebookCallback = (0, catchAsync_1.default)((req, res) => __awaiter(void 
         data: { user, accessToken, refreshToken },
     });
 }));
+// --- COMPLETE FACEBOOK LOGIN ---
 const facebookComplete = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, profile } = req.body;
     if (!email)
         throw new Error("Email is required to complete Facebook login");
-    // Complete login using temporary profile + email
     const result = yield auth_services_1.authServices.completeFacebookLoginWithEmail(profile, email);
     (0, sendResponse_1.default)(res, {
         statusCode: 200,
         success: true,
         message: "Facebook login completed successfully",
         data: result,
+    });
+}));
+const getMeController = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    if (!((_a = req.user) === null || _a === void 0 ? void 0 : _a._id)) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.UNAUTHORIZED,
+            success: false,
+            message: "User not authenticated",
+            data: null,
+        });
+    }
+    const user = yield auth_services_1.authServices.getMeService(req.user._id);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "User info retrieved successfully",
+        data: user,
     });
 }));
 const refreshAccessToken = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -176,6 +212,16 @@ const requestPasswordResetOtpController = (0, catchAsync_1.default)((req, res) =
         data: null,
     });
 }));
+const resendPasswordResetOtpController = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { email } = req.body;
+    const result = yield auth_services_1.authServices.resendPasswordResetOtp(email);
+    return (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: result.message,
+        data: null,
+    });
+}));
 const resetPasswordWithOtpController = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, otp, newPassword } = req.body;
     const result = yield auth_services_1.authServices.resetPasswordWithOtp(email, otp, newPassword);
@@ -186,15 +232,40 @@ const resetPasswordWithOtpController = (0, catchAsync_1.default)((req, res) => _
         data: null,
     });
 }));
+const changePasswordController = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+    const { currentPassword, newPassword } = req.body;
+    console.log(userId);
+    if (!userId) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.UNAUTHORIZED,
+            success: false,
+            message: "Unauthorized",
+            data: null,
+        });
+    }
+    const result = yield auth_services_1.authServices.changePassword(userId, currentPassword, newPassword);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: result.message,
+        data: null,
+    });
+}));
 exports.authControllers = {
     register,
+    resendVerifyEmailController,
     verifyEmailController,
     login,
     googleCallback,
     facebookCallback,
     facebookComplete,
+    getMeController,
     refreshAccessToken,
     logout,
     requestPasswordResetOtpController,
+    resendPasswordResetOtpController,
     resetPasswordWithOtpController,
+    changePasswordController,
 };
