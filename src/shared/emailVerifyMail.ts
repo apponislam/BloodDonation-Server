@@ -17,18 +17,6 @@ export const sendVerificationEmail = async ({ to, name, verificationUrl }: Verif
         },
     });
 
-    // const html = `
-    // <div style="font-family: sans-serif; text-align: center;">
-    //     <h2>Verify Your Email</h2>
-    //     <p>Hi <strong>${name}</strong>,</p>
-    //     <p>Thank you for registering. Please click the button below to verify your email address:</p>
-    //     <a href="${verificationUrl}" style="display: inline-block; padding: 10px 20px; margin: 20px 0; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">
-    //         Verify Email
-    //     </a>
-    //     <p>If you did not create an account, please ignore this email.</p>
-    // </div>
-    // `;
-
     const html = `
 <div style="font-family: Arial, sans-serif; background-color: #f4f6f8; padding: 40px 20px;">
     <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">

@@ -6,8 +6,9 @@ import httpStatus from "http-status";
 import { jwtHelper } from "../../utils/jwtHelpers";
 import config from "../config";
 import ApiError from "../../errors/ApiError";
-import { generateVerificationToken } from "../../utils/verificationToken";
+import { generateOtp, generateVerificationToken } from "../../utils/tokenGenerator";
 import { sendVerificationEmail } from "../../shared/emailVerifyMail";
+import { sendOtpEmail } from "../../shared/sendOtpEmail";
 
 const registerUser = async (data: RegisterInput & { profileImg?: string }) => {
     const existing = await UserModel.findOne({ email: data.email });
@@ -258,6 +259,42 @@ const refreshToken = async (token: string) => {
     };
 };
 
+const requestPasswordResetOtp = async (email: string) => {
+    const user = await UserModel.findOne({ email });
+    if (!user) throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+
+    const { otp, expiry } = generateOtp();
+
+    user.resetPasswordOtp = otp;
+    user.resetPasswordOtpExpiry = expiry;
+    await user.save();
+
+    await sendOtpEmail({ to: user.email, name: user.name, otp });
+
+    return { message: "OTP sent to email" };
+};
+
+const resetPasswordWithOtp = async (email: string, otp: string, newPassword: string) => {
+    const user = await UserModel.findOne({ email });
+    if (!user) throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+
+    if (!user.resetPasswordOtp || user.resetPasswordOtp !== otp) {
+        throw new ApiError(httpStatus.BAD_REQUEST, "Invalid OTP");
+    }
+
+    if (!user.resetPasswordOtpExpiry || user.resetPasswordOtpExpiry < new Date()) {
+        throw new ApiError(httpStatus.BAD_REQUEST, "OTP expired");
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetPasswordOtp = undefined;
+    user.resetPasswordOtpExpiry = undefined;
+
+    await user.save();
+
+    return { message: "Password reset successful" };
+};
+
 export const authServices = {
     registerUser,
     verifyEmailService,
@@ -266,4 +303,6 @@ export const authServices = {
     handleFacebookLogin,
     completeFacebookLoginWithEmail,
     refreshToken,
+    requestPasswordResetOtp,
+    resetPasswordWithOtp,
 };

@@ -65,6 +65,8 @@ const userSchema = new mongoose_1.Schema({
             return this.accountType === "email" ? undefined : undefined;
         },
     },
+    resetPasswordOtp: { type: String },
+    resetPasswordOtpExpiry: { type: Date },
 }, {
     timestamps: true,
     versionKey: false,

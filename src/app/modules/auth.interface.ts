@@ -16,4 +16,8 @@ export interface IUser {
     isEmailVerified?: boolean;
     verificationToken?: string;
     verificationTokenExpiry?: Date;
+
+    // 👇 ADD THESE FOR OTP RESET FEATURE
+    resetPasswordOtp?: string;
+    resetPasswordOtpExpiry?: Date;
 }

@@ -22,4 +22,6 @@ router.get("/facebook", passport_1.default.authenticate("facebook", { scope: ["e
 router.get("/facebook/callback", passport_1.default.authenticate("facebook", { session: false }), auth_controller_1.authControllers.facebookCallback);
 router.post("/refresh-token", auth_controller_1.authControllers.refreshAccessToken);
 router.post("/logout", auth_controller_1.authControllers.logout);
+router.post("/forgot-password", auth_controller_1.authControllers.requestPasswordResetOtpController);
+router.post("/reset-password", auth_controller_1.authControllers.resetPasswordWithOtpController);
 exports.authRoutes = router;

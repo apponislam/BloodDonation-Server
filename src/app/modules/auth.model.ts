@@ -67,6 +67,8 @@ const userSchema = new Schema<IUser>(
                 return this.accountType === "email" ? undefined : undefined;
             },
         },
+        resetPasswordOtp: { type: String },
+        resetPasswordOtpExpiry: { type: Date },
     },
     {
         timestamps: true,

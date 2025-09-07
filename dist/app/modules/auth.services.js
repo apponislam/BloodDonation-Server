@@ -31,8 +31,9 @@ const http_status_1 = __importDefault(require("http-status"));
 const jwtHelpers_1 = require("../../utils/jwtHelpers");
 const config_1 = __importDefault(require("../config"));
 const ApiError_1 = __importDefault(require("../../errors/ApiError"));
-const verificationToken_1 = require("../../utils/verificationToken");
+const tokenGenerator_1 = require("../../utils/tokenGenerator");
 const emailVerifyMail_1 = require("../../shared/emailVerifyMail");
+const sendOtpEmail_1 = require("../../shared/sendOtpEmail");
 const registerUser = (data) => __awaiter(void 0, void 0, void 0, function* () {
     const existing = yield auth_model_1.UserModel.findOne({ email: data.email });
     if (existing)
@@ -42,7 +43,7 @@ const registerUser = (data) => __awaiter(void 0, void 0, void 0, function* () {
         hashedPassword = yield bcrypt_1.default.hash(data.password, Number(config_1.default.bcrypt_salt_rounds));
     }
     const userData = Object.assign(Object.assign({}, data), { password: hashedPassword });
-    const { token, expiry } = (0, verificationToken_1.generateVerificationToken)(24); // 24 hours
+    const { token, expiry } = (0, tokenGenerator_1.generateVerificationToken)(24); // 24 hours
     userData.verificationToken = token;
     userData.verificationTokenExpiry = expiry;
     userData.isEmailVerified = false;
@@ -236,6 +237,33 @@ const refreshToken = (token) => __awaiter(void 0, void 0, void 0, function* () {
         user: userWithoutPassword,
     };
 });
+const requestPasswordResetOtp = (email) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = yield auth_model_1.UserModel.findOne({ email });
+    if (!user)
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
+    const { otp, expiry } = (0, tokenGenerator_1.generateOtp)();
+    user.resetPasswordOtp = otp;
+    user.resetPasswordOtpExpiry = expiry;
+    yield user.save();
+    yield (0, sendOtpEmail_1.sendOtpEmail)({ to: user.email, name: user.name, otp });
+    return { message: "OTP sent to email" };
+});
+const resetPasswordWithOtp = (email, otp, newPassword) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = yield auth_model_1.UserModel.findOne({ email });
+    if (!user)
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
+    if (!user.resetPasswordOtp || user.resetPasswordOtp !== otp) {
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid OTP");
+    }
+    if (!user.resetPasswordOtpExpiry || user.resetPasswordOtpExpiry < new Date()) {
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "OTP expired");
+    }
+    user.password = yield bcrypt_1.default.hash(newPassword, 10);
+    user.resetPasswordOtp = undefined;
+    user.resetPasswordOtpExpiry = undefined;
+    yield user.save();
+    return { message: "Password reset successful" };
+});
 exports.authServices = {
     registerUser,
     verifyEmailService,
@@ -244,4 +272,6 @@ exports.authServices = {
     handleFacebookLogin,
     completeFacebookLoginWithEmail,
     refreshToken,
+    requestPasswordResetOtp,
+    resetPasswordWithOtp,
 };

@@ -166,6 +166,26 @@ const logout = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0,
         data: null,
     });
 }));
+const requestPasswordResetOtpController = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { email } = req.body;
+    const result = yield auth_services_1.authServices.requestPasswordResetOtp(email);
+    return (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: result.message,
+        data: null,
+    });
+}));
+const resetPasswordWithOtpController = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { email, otp, newPassword } = req.body;
+    const result = yield auth_services_1.authServices.resetPasswordWithOtp(email, otp, newPassword);
+    return (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: result.message,
+        data: null,
+    });
+}));
 exports.authControllers = {
     register,
     verifyEmailController,
@@ -175,4 +195,6 @@ exports.authControllers = {
     facebookComplete,
     refreshAccessToken,
     logout,
+    requestPasswordResetOtpController,
+    resetPasswordWithOtpController,
 };
