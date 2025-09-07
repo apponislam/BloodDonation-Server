@@ -104,6 +104,7 @@ const login = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, 
 // --- GOOGLE CALLBACK ---
 const googleCallback = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { user, accessToken, refreshToken } = req.user;
+    console.log(user, accessToken, refreshAccessToken);
     res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -120,7 +121,8 @@ const googleCallback = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
 // --- FACEBOOK CALLBACK ---
 const facebookCallback = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const result = req.user;
-    if (result.requiresEmail) {
+    // Type guard
+    if ("requiresEmail" in result && result.requiresEmail) {
         return (0, sendResponse_1.default)(res, {
             statusCode: 200,
             success: true,
@@ -128,8 +130,9 @@ const facebookCallback = (0, catchAsync_1.default)((req, res) => __awaiter(void 
             data: result,
         });
     }
-    const { user, accessToken, refreshToken } = result;
-    res.cookie("refreshToken", refreshToken, {
+    // After guard, TS knows result is ISocialUser
+    const user = result;
+    res.cookie("refreshToken", user.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
@@ -139,7 +142,11 @@ const facebookCallback = (0, catchAsync_1.default)((req, res) => __awaiter(void 
         statusCode: 200,
         success: true,
         message: "Facebook login successful",
-        data: { user, accessToken, refreshToken },
+        data: {
+            user,
+            accessToken: user.accessToken,
+            refreshToken: user.refreshToken,
+        },
     });
 }));
 // --- COMPLETE FACEBOOK LOGIN ---

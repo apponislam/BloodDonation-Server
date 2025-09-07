@@ -34,3 +34,11 @@ export interface IUser {
 
 // Mongoose document type
 export type IUserDocument = HydratedDocument<IUser>;
+
+export interface ISocialUser {
+    user: IUserDocument;
+    accessToken: string;
+    refreshToken: string;
+}
+
+export type IFacebookLoginResult = ISocialUser | { requiresEmail: true; profile: { name: string; profileImg?: string } };

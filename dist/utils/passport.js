@@ -25,11 +25,8 @@ passport_1.default.use(new passport_google_oauth20_1.Strategy({
 }, (accessToken, refreshToken, profile, done) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const result = yield auth_services_1.authServices.handleGoogleLogin(profile);
-        const userWithTokens = Object.assign(result.user.toObject(), {
-            accessToken: result.accessToken,
-            refreshToken: result.refreshToken,
-        });
-        return done(null, userWithTokens);
+        // Cast to unknown first to satisfy Passport type
+        return done(null, result);
     }
     catch (error) {
         return done(error, false);
@@ -43,7 +40,18 @@ passport_1.default.use(new passport_facebook_1.Strategy({
 }, (accessToken, refreshToken, profile, done) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const result = yield auth_services_1.authServices.handleFacebookLogin(profile);
-        return done(null, result);
+        // Wrap in object with 'user' property if missing
+        if ("requiresEmail" in result) {
+            // Facebook requires email branch
+            return done(null, result);
+        }
+        // Social user branch
+        const userWithTokens = {
+            user: result.user.toObject(), // ensure plain object
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+        };
+        return done(null, userWithTokens);
     }
     catch (error) {
         return done(error, false);

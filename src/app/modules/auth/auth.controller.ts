@@ -5,6 +5,7 @@ import httpStatus from "http-status";
 import config from "../../config";
 import sendResponse from "../../../utils/sendResponse.";
 import ApiError from "../../../errors/ApiError";
+import { IFacebookLoginResult, ISocialUser } from "./auth.interface";
 
 const register = catchAsync(async (req: Request, res: Response) => {
     // Handle profile image if uploaded
@@ -110,6 +111,8 @@ const login = catchAsync(async (req: Request, res: Response) => {
 const googleCallback = catchAsync(async (req: Request, res: Response) => {
     const { user, accessToken, refreshToken } = req.user as any;
 
+    console.log(user, accessToken, refreshAccessToken);
+
     res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -127,9 +130,10 @@ const googleCallback = catchAsync(async (req: Request, res: Response) => {
 
 // --- FACEBOOK CALLBACK ---
 const facebookCallback = catchAsync(async (req: Request, res: Response) => {
-    const result = req.user as any;
+    const result = req.user as IFacebookLoginResult;
 
-    if (result.requiresEmail) {
+    // Type guard
+    if ("requiresEmail" in result && result.requiresEmail) {
         return sendResponse(res, {
             statusCode: 200,
             success: true,
@@ -138,9 +142,10 @@ const facebookCallback = catchAsync(async (req: Request, res: Response) => {
         });
     }
 
-    const { user, accessToken, refreshToken } = result;
+    // After guard, TS knows result is ISocialUser
+    const user = result as ISocialUser;
 
-    res.cookie("refreshToken", refreshToken, {
+    res.cookie("refreshToken", user.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
@@ -151,7 +156,11 @@ const facebookCallback = catchAsync(async (req: Request, res: Response) => {
         statusCode: 200,
         success: true,
         message: "Facebook login successful",
-        data: { user, accessToken, refreshToken },
+        data: {
+            user,
+            accessToken: user.accessToken,
+            refreshToken: user.refreshToken,
+        },
     });
 });
 
