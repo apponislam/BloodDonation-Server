@@ -4,32 +4,50 @@ export const roles = {
     USER: "user" as const,
     ADMIN: "admin" as const,
     MODERATOR: "moderator" as const,
+    SUPER_ADMIN: "super_admin" as const,
 };
 
 export type Role = (typeof roles)[keyof typeof roles];
 
-// User interface
+export type AccountType = "email" | "google" | "facebook" | "github" | "apple";
+
+/**
+ * Main user interface
+ */
 export interface IUser {
+    serialId: string; // Unique professional ID like BDU-034582-454855
+
+    // Basic info
     name: string;
     email: string;
     password: string;
     phone?: string;
-    profileImg?: string; // URL to profile image
+    profileImg?: string;
+
+    // Role & status
     role: Role;
     isActive: boolean;
-    accountType: "email" | "google" | "facebook" | "github" | "apple";
-    lastLogin?: Date;
-    createdAt?: Date;
-    updatedAt?: Date;
+    deactivatedBy?: string;
+    deactivationReason?: string;
 
-    // Email verification
+    // Account type & authentication
+    accountType: AccountType;
+    lastLogin?: Date;
     isEmailVerified?: boolean;
     verificationToken?: string;
     verificationTokenExpiry?: Date;
 
-    // OTP Reset
+    // OTP / password reset
     resetPasswordOtp?: string;
     resetPasswordOtpExpiry?: Date;
+
+    // Optional references
+    profile: Types.ObjectId;
+    realtimeLocation: Types.ObjectId;
+
+    // Audit
+    createdAt?: Date;
+    updatedAt?: Date;
 }
 
 // Mongoose document type

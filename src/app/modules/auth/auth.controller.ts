@@ -8,7 +8,6 @@ import ApiError from "../../../errors/ApiError";
 import { IFacebookLoginResult, ISocialUser } from "./auth.interface";
 
 const register = catchAsync(async (req: Request, res: Response) => {
-    // Handle profile image if uploaded
     const profileImg = req.file ? `/uploads/profile/${req.file.filename}` : undefined;
 
     const result = await authServices.registerUser({
@@ -16,7 +15,6 @@ const register = catchAsync(async (req: Request, res: Response) => {
         profileImg,
     });
 
-    // Set refresh token in cookie
     res.cookie("refreshToken", result.refreshToken, {
         httpOnly: true,
         secure: config.node_env === "production",

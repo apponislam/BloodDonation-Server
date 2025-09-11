@@ -15,7 +15,7 @@ passport.use(
         },
         async (accessToken, refreshToken, profile, done) => {
             try {
-                const result: ISocialUser = await authServices.handleGoogleLogin(profile);
+                const result = await authServices.handleGoogleLogin(profile);
 
                 // Cast to unknown first to satisfy Passport type
                 return done(null, result as unknown as Express.User);
@@ -46,7 +46,7 @@ passport.use(
 
                 // Social user branch
                 const userWithTokens = {
-                    user: result.user.toObject(), // ensure plain object
+                    user: result.user, // ensure plain object
                     accessToken: result.accessToken,
                     refreshToken: result.refreshToken,
                 };

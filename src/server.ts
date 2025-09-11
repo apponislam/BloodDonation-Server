@@ -3,6 +3,8 @@ import app from "./app";
 import config from "./app/config";
 import mongoose from "mongoose";
 import http from "http";
+import createSuperAdmin from "./scripts/createSuperAdmin";
+import { generateRandomId } from "./utils/id-generator";
 
 let server: Server;
 
@@ -10,6 +12,7 @@ async function main() {
     try {
         await mongoose.connect(config.mongodb_url as string);
         server = http.createServer(app);
+        createSuperAdmin();
 
         server.listen(config.port, () => {
             console.log(`✅ App listening on port ${config.port}`);

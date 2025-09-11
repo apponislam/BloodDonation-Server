@@ -9,55 +9,129 @@ import ApiError from "../../../errors/ApiError";
 import { generateOtp, generateVerificationToken } from "../../../utils/tokenGenerator";
 import { sendVerificationEmail } from "../../../shared/emailVerifyMail";
 import { sendOtpEmail } from "../../../shared/sendOtpEmail";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
+import { generateRandomId } from "../../../utils/id-generator";
+import { ProfileModel } from "../profile/profile.model";
+import { RealtimeLocationModel } from "../realTimeLocation/realTimeLocation.model";
 
 const registerUser = async (data: RegisterInput & { profileImg?: string }) => {
-    const existing = await UserModel.findOne({ email: data.email });
-    if (existing) throw new ApiError(httpStatus.BAD_REQUEST, "Email already in use");
+    const session = await mongoose.startSession();
 
-    let hashedPassword: string | undefined = undefined;
-    if (data.password) {
-        hashedPassword = await bcrypt.hash(data.password, Number(config.bcrypt_salt_rounds));
+    try {
+        session.startTransaction();
+
+        // Check if email exists
+        const existing = await UserModel.findOne({ email: data.email }).session(session);
+        if (existing) {
+            await session.abortTransaction();
+            session.endSession();
+            throw new ApiError(httpStatus.BAD_REQUEST, "Email already in use");
+        }
+
+        // Hash password if provided
+        let hashedPassword: string | undefined = undefined;
+        if (data.password) {
+            hashedPassword = await bcrypt.hash(data.password, Number(config.bcrypt_salt_rounds));
+        }
+
+        // Generate unique serialId
+        const serialId = await generateRandomId(UserModel, "BDU");
+
+        // Prepare user data
+        const userData: any = {
+            ...data,
+            serialId,
+            role: data.role || "user",
+            password: hashedPassword,
+        };
+
+        // Generate verification for email accounts
+        if (data.accountType === "email") {
+            const { token, expiry } = generateVerificationToken(24);
+            userData.verificationToken = token;
+            userData.verificationTokenExpiry = expiry;
+            userData.isEmailVerified = false;
+        }
+
+        // Create temporary ObjectIds for references
+        const tempProfileId = new mongoose.Types.ObjectId();
+        const tempLocationId = new mongoose.Types.ObjectId();
+
+        // Add temporary references to user data
+        userData.profile = tempProfileId;
+        userData.realtimeLocation = tempLocationId;
+
+        // Create user with session
+        const users = await UserModel.create([userData], { session });
+        const createdUser = users[0];
+
+        // Create profile with actual user reference
+        const profileData = {
+            _id: tempProfileId,
+            user: createdUser._id,
+            serialId: createdUser.serialId,
+            profileImg: data.profileImg,
+        };
+
+        // Create realtime location with actual user reference
+        const locationData = {
+            _id: tempLocationId,
+            user: createdUser._id,
+            serialId: createdUser.serialId,
+            latitude: 0,
+            longitude: 0,
+            hideLocation: true,
+        };
+
+        // Create both documents in parallel
+        await Promise.all([ProfileModel.create([profileData], { session }), RealtimeLocationModel.create([locationData], { session })]);
+
+        // Commit the transaction
+        await session.commitTransaction();
+        session.endSession();
+
+        // Send verification email if needed
+        if (createdUser.accountType === "email") {
+            const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${createdUser.verificationToken}&id=${createdUser._id}`;
+            await sendVerificationEmail({
+                to: createdUser.email,
+                name: createdUser.name,
+                verificationUrl,
+            });
+        }
+
+        // Populate profile and realtimeLocation before returning
+        const populatedUser = await UserModel.findById(createdUser._id).populate("profile").populate("realtimeLocation").exec();
+
+        if (!populatedUser) throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, "User not found after creation");
+
+        // Generate JWT tokens
+        const jwtPayload = {
+            _id: populatedUser._id,
+            name: populatedUser.name,
+            email: populatedUser.email,
+            profileImg: populatedUser.profileImg,
+            role: populatedUser.role,
+            serialId: populatedUser.serialId,
+        };
+
+        const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret as string, config.jwt_access_expire as string);
+        const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret as string, config.jwt_refresh_expire as string);
+
+        // Remove password
+        const { password, ...userWithoutPassword } = populatedUser.toObject();
+
+        return {
+            user: userWithoutPassword,
+            accessToken,
+            refreshToken,
+        };
+    } catch (error) {
+        // Abort transaction on error
+        await session.abortTransaction();
+        session.endSession();
+        throw error;
     }
-
-    const userData: any = {
-        ...data,
-        password: hashedPassword,
-    };
-
-    const { token, expiry } = generateVerificationToken(24); // 24 hours
-    userData.verificationToken = token;
-    userData.verificationTokenExpiry = expiry;
-    userData.isEmailVerified = false;
-
-    const user = await UserModel.create(userData);
-
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${user.verificationToken}&id=${user._id}`;
-    await sendVerificationEmail({
-        to: user.email,
-        name: user.name,
-        verificationUrl,
-    });
-
-    const jwtPayload = {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        profileImg: user.profileImg,
-        role: user.role,
-    };
-
-    const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret as string, config.jwt_access_expire as string);
-
-    const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret as string, config.jwt_refresh_expire as string);
-
-    const { password, ...userWithoutPassword } = user.toObject();
-
-    return {
-        user: userWithoutPassword,
-        accessToken,
-        refreshToken,
-    };
 };
 
 const resendVerificationEmailService = async (userId: string) => {
@@ -105,7 +179,7 @@ const verifyEmailService = async (userId: string, token: string) => {
 };
 
 const loginUser = async (data: LoginInput) => {
-    const user = await UserModel.findOne({ email: data.email }).select("+password");
+    const user = await UserModel.findOne({ email: data.email }).select("+password").populate("profile").populate("realtimeLocation").exec();
     if (!user) throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid credentials");
 
     const isMatch = await bcrypt.compare(data.password, user.password);
@@ -136,40 +210,235 @@ const loginUser = async (data: LoginInput) => {
 };
 
 // --- GOOGLE LOGIN ---
+// const handleGoogleLogin = async (profile: any) => {
+//     const email = profile.emails?.[0]?.value;
+//     if (!email) throw new ApiError(httpStatus.BAD_REQUEST, "Google profile does not contain email");
+
+//     let user = await UserModel.findOne({ email });
+
+//     if (!user) {
+//         const serialId = await generateRandomId(UserModel, "BDU");
+
+//         user = await UserModel.create({
+//             serialId,
+//             name: profile.displayName,
+//             email,
+//             profileImg: profile.photos?.[0]?.value,
+//             role: "user",
+//             isActive: true,
+//             lastLogin: new Date(),
+//             accountType: "google",
+//         });
+//     } else {
+//         user.lastLogin = new Date();
+//         await user.save();
+//     }
+
+//     const jwtPayload = {
+//         _id: user._id,
+//         name: user.name,
+//         email: user.email,
+//         profileImg: user.profileImg,
+//         role: user.role,
+//         serialId: user.serialId,
+//     };
+
+//     const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret!, config.jwt_access_expire!);
+//     const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret!, config.jwt_refresh_expire!);
+
+//     return { user, accessToken, refreshToken };
+// };
+
 const handleGoogleLogin = async (profile: any) => {
-    const email = profile.emails?.[0]?.value;
-    if (!email) throw new ApiError(httpStatus.BAD_REQUEST, "Google profile does not contain email");
+    const session = await mongoose.startSession();
 
-    let user = await UserModel.findOne({ email });
+    try {
+        session.startTransaction();
 
-    if (!user) {
-        user = await UserModel.create({
-            name: profile.displayName,
-            email,
-            profileImg: profile.photos?.[0]?.value,
-            role: "user",
-            isActive: true,
-            lastLogin: new Date(),
-            accountType: "google",
-        });
-    } else {
-        user.lastLogin = new Date();
-        await user.save();
+        const email = profile.emails?.[0]?.value;
+        if (!email) {
+            await session.abortTransaction();
+            session.endSession();
+            throw new ApiError(httpStatus.BAD_REQUEST, "Google profile does not contain email");
+        }
+
+        // Check if user already exists
+        let user = await UserModel.findOne({ email }).session(session);
+
+        if (!user) {
+            // Generate unique serialId
+            const serialId = await generateRandomId(UserModel, "BDU");
+
+            // Create temporary ObjectIds for references
+            const tempProfileId = new mongoose.Types.ObjectId();
+            const tempLocationId = new mongoose.Types.ObjectId();
+
+            // Prepare user data with temporary references
+            const userData: any = {
+                serialId,
+                name: profile.displayName,
+                email,
+                profileImg: profile.photos?.[0]?.value,
+                role: "user",
+                isActive: true,
+                lastLogin: new Date(),
+                accountType: "google",
+                profile: tempProfileId,
+                realtimeLocation: tempLocationId,
+            };
+
+            // Create user with session
+            const users = await UserModel.create([userData], { session });
+            user = users[0];
+
+            // Create Profile & RealtimeLocation
+            const profileData = {
+                _id: tempProfileId,
+                user: user._id,
+                serialId: user.serialId,
+                profileImg: profile.photos?.[0]?.value,
+            };
+
+            const locationData = {
+                _id: tempLocationId,
+                user: user._id,
+                serialId: user.serialId,
+                latitude: 0,
+                longitude: 0,
+                hideLocation: true,
+            };
+
+            await Promise.all([ProfileModel.create([profileData], { session }), RealtimeLocationModel.create([locationData], { session })]);
+        } else {
+            // Existing user, just update last login
+            user.lastLogin = new Date();
+            await user.save({ session });
+        }
+
+        // Commit transaction
+        await session.commitTransaction();
+        session.endSession();
+
+        // Populate profile and realtimeLocation
+        const populatedUser = await UserModel.findById(user._id).populate("profile").populate("realtimeLocation").exec();
+
+        if (!populatedUser) throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, "User not found after login");
+
+        // Generate JWT tokens
+        const jwtPayload = {
+            _id: populatedUser._id,
+            name: populatedUser.name,
+            email: populatedUser.email,
+            profileImg: populatedUser.profileImg,
+            role: populatedUser.role,
+            serialId: populatedUser.serialId,
+        };
+
+        const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret as string, config.jwt_access_expire as string);
+        const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret as string, config.jwt_refresh_expire as string);
+
+        // Remove password if exists
+        const { password, ...userWithoutPassword } = populatedUser.toObject();
+
+        return {
+            user: userWithoutPassword,
+            accessToken,
+            refreshToken,
+        };
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        throw error;
     }
-
-    const jwtPayload = {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        profileImg: user.profileImg,
-        role: user.role,
-    };
-
-    const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret!, config.jwt_access_expire!);
-    const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret!, config.jwt_refresh_expire!);
-
-    return { user, accessToken, refreshToken };
 };
+
+// // --- FACEBOOK LOGIN ---
+// const handleFacebookLogin = async (profile: any) => {
+//     const email = profile.emails?.[0]?.value;
+
+//     if (!email) {
+//         return {
+//             requiresEmail: true,
+//             profile: {
+//                 name: profile.displayName,
+//                 profileImg: profile.photos?.[0]?.value,
+//             },
+//         };
+//     }
+
+//     let user = await UserModel.findOne({ email });
+
+//     if (!user) {
+//         const serialId = await generateRandomId(UserModel, "BDU");
+
+//         user = await UserModel.create({
+//             serialId,
+//             name: profile.displayName,
+//             email,
+//             password: undefined,
+//             profileImg: profile.photos?.[0]?.value,
+//             role: "user",
+//             isActive: true,
+//             accountType: "facebook",
+//             lastLogin: new Date(),
+//         });
+//     } else {
+//         user.lastLogin = new Date();
+//         await user.save();
+//     }
+
+//     const jwtPayload = {
+//         _id: user._id,
+//         name: user.name,
+//         email: user.email,
+//         profileImg: user.profileImg,
+//         role: user.role,
+//         serialId: user.serialId,
+//     };
+
+//     const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret!, config.jwt_access_expire!);
+//     const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret!, config.jwt_refresh_expire!);
+
+//     return { user, accessToken, refreshToken };
+// };
+
+// // --- COMPLETE FACEBOOK LOGIN ---
+// const completeFacebookLoginWithEmail = async (profile: any, email: string) => {
+//     let user = await UserModel.findOne({ email });
+
+//     if (!user) {
+//         const serialId = await generateRandomId(UserModel, "BDU");
+
+//         user = await UserModel.create({
+//             serialId,
+//             name: profile.name,
+//             email,
+//             password: undefined,
+//             profileImg: profile.profileImg,
+//             role: "user",
+//             isActive: true,
+//             accountType: "facebook",
+//             lastLogin: new Date(),
+//         });
+//     } else {
+//         user.lastLogin = new Date();
+//         await user.save();
+//     }
+
+//     const jwtPayload = {
+//         _id: user._id,
+//         name: user.name,
+//         email: user.email,
+//         profileImg: user.profileImg,
+//         role: user.role,
+//         serialId: user.serialId,
+//     };
+
+//     const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret!, config.jwt_access_expire!);
+//     const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret!, config.jwt_refresh_expire!);
+
+//     return { user, accessToken, refreshToken };
+// };
 
 // --- FACEBOOK LOGIN ---
 const handleFacebookLogin = async (profile: any) => {
@@ -185,70 +454,169 @@ const handleFacebookLogin = async (profile: any) => {
         };
     }
 
-    let user = await UserModel.findOne({ email });
+    const session = await mongoose.startSession();
+    try {
+        session.startTransaction();
 
-    if (!user) {
-        user = await UserModel.create({
-            name: profile.displayName,
-            email,
-            password: "",
-            profileImg: profile.photos?.[0]?.value,
-            role: "user",
-            isActive: true,
-            accountType: "facebook",
-            lastLogin: new Date(),
-        });
-    } else {
-        user.lastLogin = new Date();
-        await user.save();
+        let user = await UserModel.findOne({ email }).session(session);
+
+        if (!user) {
+            // Generate serialId and temporary ObjectIds
+            const serialId = await generateRandomId(UserModel, "BDU");
+            const tempProfileId = new mongoose.Types.ObjectId();
+            const tempLocationId = new mongoose.Types.ObjectId();
+
+            const userData: any = {
+                serialId,
+                name: profile.displayName,
+                email,
+                password: undefined,
+                profileImg: profile.photos?.[0]?.value,
+                role: "user",
+                isActive: true,
+                accountType: "facebook",
+                lastLogin: new Date(),
+                profile: tempProfileId,
+                realtimeLocation: tempLocationId,
+            };
+
+            const users = await UserModel.create([userData], { session });
+            user = users[0];
+
+            // Create profile & realtime location
+            const profileData = {
+                _id: tempProfileId,
+                user: user._id,
+                serialId,
+                profileImg: profile.photos?.[0]?.value,
+            };
+
+            const locationData = {
+                _id: tempLocationId,
+                user: user._id,
+                serialId,
+                latitude: 0,
+                longitude: 0,
+                hideLocation: true,
+            };
+
+            await Promise.all([ProfileModel.create([profileData], { session }), RealtimeLocationModel.create([locationData], { session })]);
+        } else {
+            user.lastLogin = new Date();
+            await user.save({ session });
+        }
+
+        await session.commitTransaction();
+        session.endSession();
+
+        // Populate
+        const populatedUser = await UserModel.findById(user._id).populate("profile").populate("realtimeLocation").exec();
+
+        if (!populatedUser) throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, "User not found");
+
+        const jwtPayload = {
+            _id: populatedUser._id,
+            name: populatedUser.name,
+            email: populatedUser.email,
+            profileImg: populatedUser.profileImg,
+            role: populatedUser.role,
+            serialId: populatedUser.serialId,
+        };
+
+        const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret!, config.jwt_access_expire!);
+        const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret!, config.jwt_refresh_expire!);
+
+        const { password, ...userWithoutPassword } = populatedUser.toObject();
+
+        return { user: userWithoutPassword, accessToken, refreshToken };
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        throw error;
     }
-
-    const jwtPayload = {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        profileImg: user.profileImg,
-        role: user.role,
-    };
-
-    const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret!, config.jwt_access_expire!);
-    const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret!, config.jwt_refresh_expire!);
-
-    return { user, accessToken, refreshToken };
 };
 
-// --- COMPLETE FACEBOOK LOGIN ---
+// --- COMPLETE FACEBOOK LOGIN WITH EMAIL ---
 const completeFacebookLoginWithEmail = async (profile: any, email: string) => {
-    let user = await UserModel.findOne({ email });
+    const session = await mongoose.startSession();
+    try {
+        session.startTransaction();
 
-    if (!user) {
-        user = await UserModel.create({
-            name: profile.name,
-            email,
-            password: "",
-            profileImg: profile.profileImg,
-            role: "user",
-            isActive: true,
-            accountType: "facebook",
-            lastLogin: new Date(),
-        });
-    } else {
-        user.lastLogin = new Date();
-        await user.save();
+        let user = await UserModel.findOne({ email }).session(session);
+
+        if (!user) {
+            // Generate serialId and temporary ObjectIds
+            const serialId = await generateRandomId(UserModel, "BDU");
+            const tempProfileId = new mongoose.Types.ObjectId();
+            const tempLocationId = new mongoose.Types.ObjectId();
+
+            const userData: any = {
+                serialId,
+                name: profile.name,
+                email,
+                password: undefined,
+                profileImg: profile.profileImg,
+                role: "user",
+                isActive: true,
+                accountType: "facebook",
+                lastLogin: new Date(),
+                profile: tempProfileId,
+                realtimeLocation: tempLocationId,
+            };
+
+            const users = await UserModel.create([userData], { session });
+            user = users[0];
+
+            const profileData = {
+                _id: tempProfileId,
+                user: user._id,
+                serialId,
+                profileImg: profile.profileImg,
+            };
+
+            const locationData = {
+                _id: tempLocationId,
+                user: user._id,
+                serialId,
+                latitude: 0,
+                longitude: 0,
+                hideLocation: true,
+            };
+
+            await Promise.all([ProfileModel.create([profileData], { session }), RealtimeLocationModel.create([locationData], { session })]);
+        } else {
+            user.lastLogin = new Date();
+            await user.save({ session });
+        }
+
+        await session.commitTransaction();
+        session.endSession();
+
+        // Populate
+        const populatedUser = await UserModel.findById(user._id).populate("profile").populate("realtimeLocation").exec();
+
+        if (!populatedUser) throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, "User not found");
+
+        const jwtPayload = {
+            _id: populatedUser._id,
+            name: populatedUser.name,
+            email: populatedUser.email,
+            profileImg: populatedUser.profileImg,
+            role: populatedUser.role,
+            serialId: populatedUser.serialId,
+        };
+
+        const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret!, config.jwt_access_expire!);
+        const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret!, config.jwt_refresh_expire!);
+
+        const { password, ...userWithoutPassword } = populatedUser.toObject();
+
+        return { user: userWithoutPassword, accessToken, refreshToken };
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        throw error;
     }
-
-    const jwtPayload = {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        profileImg: user.profileImg,
-        role: user.role,
-    };
-
-    const accessToken = jwtHelper.generateToken(jwtPayload, config.jwt_access_secret!, config.jwt_access_expire!);
-    const refreshToken = jwtHelper.generateToken(jwtPayload, config.jwt_refresh_secret!, config.jwt_refresh_expire!);
-
-    return { user, accessToken, refreshToken };
 };
 
 const getMeService = async (userId: string | Types.ObjectId) => {

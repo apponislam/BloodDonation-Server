@@ -12,7 +12,11 @@ export const registerSchema = z.object({
             message: "Invalid email address",
         }),
     password: z.string().min(6, "Password must be at least 6 characters").max(100, "Password must be at most 100 characters").optional(), // make optional for OAuth users
-    phone: z.string().optional(),
+    phone: z
+        .string()
+        .optional()
+        .refine((val) => !val || /^\+?\d{7,15}$/.test(val), { message: "Invalid phone number" }),
+    role: z.enum(["user", "admin", "moderator", "super_admin"]).optional().default("user"),
     accountType: z.enum(accountTypes).default("email"),
 });
 

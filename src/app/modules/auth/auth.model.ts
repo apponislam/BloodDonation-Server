@@ -1,8 +1,10 @@
 import { model, Schema } from "mongoose";
 import { IUser } from "./auth.interface";
+import { RealtimeLocationModel } from "../realTimeLocation/realTimeLocation.model";
 
 const userSchema = new Schema<IUser>(
     {
+        serialId: { type: String, unique: true, index: true },
         name: {
             type: String,
             required: [true, "Name is required"],
@@ -33,7 +35,7 @@ const userSchema = new Schema<IUser>(
         role: {
             type: String,
             enum: {
-                values: ["user", "admin", "moderator"],
+                values: ["user", "admin", "moderator", "super_admin"],
                 message: "Role must be either user, admin, or moderator",
             },
             default: "user",
@@ -67,6 +69,8 @@ const userSchema = new Schema<IUser>(
                 return this.accountType === "email" ? undefined : undefined;
             },
         },
+        profile: { type: Schema.Types.ObjectId, ref: "Profile" },
+        realtimeLocation: { type: Schema.Types.ObjectId, ref: "RealtimeLocation" },
         resetPasswordOtp: { type: String },
         resetPasswordOtpExpiry: { type: Date },
     },
@@ -100,5 +104,21 @@ userSchema.post("save", function (doc, next) {
     doc.password = undefined as any;
     next();
 });
+
+// userSchema.post("save", async function (doc) {
+//     try {
+//         const existingLocation = await RealtimeLocationModel.findOne({ user: doc._id });
+//         if (!existingLocation) {
+//             await RealtimeLocationModel.create({
+//                 user: doc._id,
+//                 serialId: doc.serialId, // reuse user's serialId
+//                 latitude: 0,
+//                 longitude: 0,
+//             });
+//         }
+//     } catch (err) {
+//         console.error("Error creating default RealtimeLocation:", err);
+//     }
+// });
 
 export const UserModel = model<IUser>("User", userSchema);
