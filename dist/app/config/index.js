@@ -27,6 +27,8 @@ exports.default = {
         smtp_user: process.env.SMTP_USER,
         smtp_pass: process.env.SMTP_PASS,
     },
+    superAdminPassword: process.env.SUPERADMINPASSWORD,
+    superAdminEmail: process.env.SUPERADMINEMAIL,
     // stripe_publishable_key: process.env.STRIPE_PUBLISHABLE_KEY,
     // stripe_secret_key: process.env.STRIPE_SECRET_KEY,
     // stripe_webhook_secret: process.env.STRIPE_WEBHOOK_SECRET,

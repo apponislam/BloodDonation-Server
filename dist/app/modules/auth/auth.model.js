@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserModel = void 0;
 const mongoose_1 = require("mongoose");
 const userSchema = new mongoose_1.Schema({
+    serialId: { type: String, unique: true, index: true },
     name: {
         type: String,
         required: [true, "Name is required"],
@@ -32,7 +33,7 @@ const userSchema = new mongoose_1.Schema({
     role: {
         type: String,
         enum: {
-            values: ["user", "admin", "moderator"],
+            values: ["user", "admin", "moderator", "super_admin"],
             message: "Role must be either user, admin, or moderator",
         },
         default: "user",
@@ -65,6 +66,8 @@ const userSchema = new mongoose_1.Schema({
             return this.accountType === "email" ? undefined : undefined;
         },
     },
+    profile: { type: mongoose_1.Schema.Types.ObjectId, ref: "Profile" },
+    realtimeLocation: { type: mongoose_1.Schema.Types.ObjectId, ref: "RealtimeLocation" },
     resetPasswordOtp: { type: String },
     resetPasswordOtpExpiry: { type: Date },
 }, {

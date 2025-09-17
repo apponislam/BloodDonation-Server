@@ -47,7 +47,7 @@ passport_1.default.use(new passport_facebook_1.Strategy({
         }
         // Social user branch
         const userWithTokens = {
-            user: result.user.toObject(), // ensure plain object
+            user: result.user, // ensure plain object
             accessToken: result.accessToken,
             refreshToken: result.refreshToken,
         };

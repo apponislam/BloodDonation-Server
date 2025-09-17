@@ -2,6 +2,16 @@ import { Types } from "mongoose";
 
 export type Gender = "male" | "female" | "other";
 
+interface IEmergencyContact {
+    name: string;
+    phone: string;
+}
+
+interface IMedicalNote {
+    type: string;
+    description: string;
+}
+
 export interface IProfile {
     user: Types.ObjectId;
     serialId: string;
@@ -10,8 +20,6 @@ export interface IProfile {
 
     dateOfBirth?: Date;
     gender?: Gender;
-
-    profileImg?: string;
 
     // Blood Info
     bloodGroup?: "A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-";
@@ -27,10 +35,12 @@ export interface IProfile {
         country?: string;
     };
 
+    isDeleted?: boolean;
+    deletedAt?: Date;
+
     // Social / Emergency
-    emergencyContactName?: string;
-    emergencyContactPhone?: string;
-    medicalNotes?: string; // allergies, conditions
+    emergencyContacts?: IEmergencyContact[];
+    medicalNotes?: IMedicalNote[];
 
     // Timestamps
     createdAt?: Date;

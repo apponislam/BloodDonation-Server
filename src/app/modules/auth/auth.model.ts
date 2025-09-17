@@ -105,20 +105,4 @@ userSchema.post("save", function (doc, next) {
     next();
 });
 
-// userSchema.post("save", async function (doc) {
-//     try {
-//         const existingLocation = await RealtimeLocationModel.findOne({ user: doc._id });
-//         if (!existingLocation) {
-//             await RealtimeLocationModel.create({
-//                 user: doc._id,
-//                 serialId: doc.serialId, // reuse user's serialId
-//                 latitude: 0,
-//                 longitude: 0,
-//             });
-//         }
-//     } catch (err) {
-//         console.error("Error creating default RealtimeLocation:", err);
-//     }
-// });
-
 export const UserModel = model<IUser>("User", userSchema);

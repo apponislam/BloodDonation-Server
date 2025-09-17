@@ -23,8 +23,8 @@ const registerUser = async (data: RegisterInput & { profileImg?: string }) => {
         // Check if email exists
         const existing = await UserModel.findOne({ email: data.email }).session(session);
         if (existing) {
-            await session.abortTransaction();
-            session.endSession();
+            // await session.abortTransaction();
+            // session.endSession();
             throw new ApiError(httpStatus.BAD_REQUEST, "Email already in use");
         }
 
@@ -70,7 +70,6 @@ const registerUser = async (data: RegisterInput & { profileImg?: string }) => {
             _id: tempProfileId,
             user: createdUser._id,
             serialId: createdUser.serialId,
-            profileImg: data.profileImg,
         };
 
         // Create realtime location with actual user reference
@@ -80,7 +79,7 @@ const registerUser = async (data: RegisterInput & { profileImg?: string }) => {
             serialId: createdUser.serialId,
             latitude: 0,
             longitude: 0,
-            hideLocation: true,
+            hideLocation: false,
         };
 
         // Create both documents in parallel

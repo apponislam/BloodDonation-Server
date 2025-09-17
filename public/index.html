@@ -88,5 +88,61 @@
             <a href="/api" class="btn">Go to API</a>
         </main>
         <footer>&copy; 2025 My Server. All rights reserved.</footer>
+        <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.8.1/dist/socket.io.min.js"></script>
+
+        <script>
+            const userId = "68c2150728ab5befa45047f7"; // replace with your actual user ID
+            const socket = io("http://localhost:5000");
+
+            socket.on("connect", () => {
+                console.log("✅ Connected to Socket.IO server:", socket.id);
+
+                // Join personal room
+                socket.emit("joinRoom", userId);
+                console.log("📥 Joining room for user:", userId);
+
+                // Update location every 5 seconds
+                setInterval(() => {
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            (position) => {
+                                const latitude = position.coords.latitude;
+                                const longitude = position.coords.longitude;
+                                const speed = position.coords.speed ?? 0;
+                                const heading = position.coords.heading ?? 0;
+
+                                console.log(latitude);
+                                console.log(longitude);
+                                console.log(speed);
+                                console.log(heading);
+
+                                // Send real location to server
+                                socket.emit("updateLocation", { userId, latitude, longitude, speed, heading });
+                                console.log("📡 Sent real location update:", { latitude, longitude, speed, heading });
+                            },
+                            (err) => {
+                                console.error("❌ Geolocation error:", err);
+                            }
+                        );
+                    } else {
+                        console.error("❌ Geolocation not supported by this browser.");
+                    }
+                }, 5000);
+            });
+
+            // Listen for all users' location updates
+            socket.on("locationUpdated", (data) => {
+                console.log("🌍 All users' locations:", data);
+            });
+
+            // Listen for distances from this user to all other users
+            socket.on("usersDistance", (distances) => {
+                console.log("📏 Distances from me to all other users:", distances);
+            });
+
+            socket.on("disconnect", () => {
+                console.log("❌ Disconnected from server");
+            });
+        </script>
     </body>
 </html>

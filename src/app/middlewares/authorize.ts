@@ -1,14 +1,16 @@
 import { NextFunction, Request, Response } from "express";
+import ApiError from "../../errors/ApiError";
+import httpStatus from "http-status";
 
 const authorize = (allowedRoles: string[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
         if (!req.user) {
-            return res.status(401).json({ message: "Unauthorized" });
+            return next(new ApiError(httpStatus.UNAUTHORIZED, "Unauthorized"));
         }
 
         const userRole = req.user.role; // TS now knows user exists
         if (!userRole || !allowedRoles.includes(userRole)) {
-            return res.status(403).json({ message: "Forbidden" });
+            return next(new ApiError(httpStatus.FORBIDDEN, "Forbidden"));
         }
 
         next();

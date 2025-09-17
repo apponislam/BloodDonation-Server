@@ -9,9 +9,11 @@ export interface IRealtimeLocation {
     longitude: number;
 
     // Optional details
-    accuracy?: number; // GPS accuracy in meters
+    accuracy?: number;
     altitude?: number;
-    heading?: number; // direction in degrees
-    speed?: number; // speed in m/s
+    heading?: number;
+    speed?: number;
+    isDeleted?: boolean;
+    deletedAt?: Date;
     hideLocation?: boolean;
 }

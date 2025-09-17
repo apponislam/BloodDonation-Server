@@ -1,5 +1,15 @@
-import { Schema, model } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 import { IProfile } from "./profile.interface";
+
+const EmergencyContactSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    phone: { type: String, required: true },
+});
+
+const MedicalNoteSchema = new mongoose.Schema({
+    type: { type: String, required: true },
+    description: { type: String, required: true },
+});
 
 const profileSchema = new Schema<IProfile>(
     {
@@ -8,8 +18,6 @@ const profileSchema = new Schema<IProfile>(
 
         dateOfBirth: { type: Date },
         gender: { type: String, enum: ["male", "female", "other"] },
-
-        profileImg: { type: String },
 
         bloodGroup: { type: String, enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] },
         lastDonationDate: { type: Date },
@@ -23,9 +31,10 @@ const profileSchema = new Schema<IProfile>(
             country: { type: String },
         },
 
-        emergencyContactName: { type: String },
-        emergencyContactPhone: { type: String },
-        medicalNotes: { type: String },
+        isDeleted: { type: Boolean, default: false },
+        deletedAt: { type: Date },
+        emergencyContacts: [EmergencyContactSchema],
+        medicalNotes: [MedicalNoteSchema],
     },
     {
         timestamps: true,

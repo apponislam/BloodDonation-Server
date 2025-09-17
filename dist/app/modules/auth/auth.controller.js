@@ -20,10 +20,8 @@ const config_1 = __importDefault(require("../../config"));
 const sendResponse_1 = __importDefault(require("../../../utils/sendResponse."));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const register = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    // Handle profile image if uploaded
     const profileImg = req.file ? `/uploads/profile/${req.file.filename}` : undefined;
     const result = yield auth_services_1.authServices.registerUser(Object.assign(Object.assign({}, req.body), { profileImg }));
-    // Set refresh token in cookie
     res.cookie("refreshToken", result.refreshToken, {
         httpOnly: true,
         secure: config_1.default.node_env === "production",

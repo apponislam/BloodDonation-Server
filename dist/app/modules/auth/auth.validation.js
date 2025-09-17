@@ -13,7 +13,11 @@ exports.registerSchema = zod_1.z.object({
         message: "Invalid email address",
     }),
     password: zod_1.z.string().min(6, "Password must be at least 6 characters").max(100, "Password must be at most 100 characters").optional(), // make optional for OAuth users
-    phone: zod_1.z.string().optional(),
+    phone: zod_1.z
+        .string()
+        .optional()
+        .refine((val) => !val || /^\+?\d{7,15}$/.test(val), { message: "Invalid phone number" }),
+    role: zod_1.z.enum(["user", "admin", "moderator", "super_admin"]).optional().default("user"),
     accountType: zod_1.z.enum(accountTypes).default("email"),
 });
 exports.loginSchema = zod_1.z.object({

@@ -13,6 +13,10 @@ const realtimeLocationSchema = new Schema<IRealtimeLocation>(
         altitude: { type: Number },
         heading: { type: Number },
         speed: { type: Number },
+
+        isDeleted: { type: Boolean, default: false },
+        deletedAt: { type: Date },
+
         hideLocation: { type: Boolean, default: false },
     },
     {

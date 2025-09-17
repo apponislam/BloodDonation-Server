@@ -4,7 +4,7 @@ import config from "./app/config";
 import mongoose from "mongoose";
 import http from "http";
 import createSuperAdmin from "./scripts/createSuperAdmin";
-import { generateRandomId } from "./utils/id-generator";
+import { initSocket } from "./socket/socketHelper";
 
 let server: Server;
 
@@ -12,6 +12,9 @@ async function main() {
     try {
         await mongoose.connect(config.mongodb_url as string);
         server = http.createServer(app);
+
+        initSocket(server);
+
         createSuperAdmin();
 
         server.listen(config.port, () => {
