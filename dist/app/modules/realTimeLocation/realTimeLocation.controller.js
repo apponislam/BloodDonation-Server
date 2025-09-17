@@ -29,6 +29,18 @@ const updateMyLocation = (0, catchAsync_1.default)((req, res) => __awaiter(void 
         data: location,
     });
 }));
+const toggleHideLocation = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+    const location = yield realTimeLocation_services_1.realtimeLocationServices.toggleHideLocation(userId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: `hideLocation is now ${location.hideLocation}`,
+        data: location,
+    });
+}));
 exports.realtimeLocationControllers = {
     updateMyLocation,
+    toggleHideLocation,
 };

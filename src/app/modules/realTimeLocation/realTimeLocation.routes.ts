@@ -6,4 +6,6 @@ const router = Router();
 
 router.post("/update", auth, realtimeLocationControllers.updateMyLocation);
 
+router.patch("/toggle-hide", auth, realtimeLocationControllers.toggleHideLocation);
+
 export const realTimeLocationRoutes = router;

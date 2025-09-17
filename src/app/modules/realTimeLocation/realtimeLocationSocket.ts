@@ -22,9 +22,16 @@ export const locationSocketHandler = (io: Server, socket: Socket) => {
         const otherUsers = await RealtimeLocationModel.find({
             user: { $nin: [userId, null] },
             hideLocation: false,
-        });
-
-        // console.log(otherUsers);
+        })
+            .populate({
+                path: "user",
+                select: "name email phone role profileImg",
+                populate: {
+                    path: "profile",
+                    select: "gender bloodGroup totalDonations lastDonationDate dateOfBirth",
+                },
+            })
+            .lean();
 
         // calculate distance from this user to all others
         const distances = otherUsers.map((u) => ({

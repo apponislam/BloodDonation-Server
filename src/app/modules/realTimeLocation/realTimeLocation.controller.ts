@@ -20,6 +20,20 @@ const updateMyLocation = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+const toggleHideLocation = catchAsync(async (req: Request, res: Response) => {
+    const userId = req.user?._id as Types.ObjectId;
+
+    const location = await realtimeLocationServices.toggleHideLocation(userId);
+
+    sendResponse<IRealtimeLocation>(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: `hideLocation is now ${location.hideLocation}`,
+        data: location,
+    });
+});
+
 export const realtimeLocationControllers = {
     updateMyLocation,
+    toggleHideLocation,
 };

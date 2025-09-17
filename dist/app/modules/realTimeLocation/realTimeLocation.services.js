@@ -18,20 +18,6 @@ const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const http_status_1 = __importDefault(require("http-status"));
 const socketHelper_1 = require("../../../socket/socketHelper");
 const distance_1 = require("../../../utils/distance");
-// const createOrUpdateLocation = async (userId: Types.ObjectId, locationData: Partial<IRealtimeLocation>): Promise<IRealtimeLocation> => {
-//     if (!userId) throw new ApiError(httpStatus.UNAUTHORIZED, "Unauthorized");
-//     const location = await RealtimeLocationModel.findOneAndUpdate({ user: userId }, { $set: locationData }, { new: true, upsert: true, setDefaultsOnInsert: true }).exec();
-//     if (!location) throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, "Failed to update location");
-//     const io = getIO();
-//     io.emit("locationUpdated", {
-//         user: location.user,
-//         latitude: location.latitude,
-//         longitude: location.longitude,
-//         speed: location.speed,
-//         heading: location.heading,
-//     });
-//     return location;
-// };
 const createOrUpdateLocation = (userId, locationData) => __awaiter(void 0, void 0, void 0, function* () {
     if (!userId)
         throw new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "Unauthorized");
@@ -47,21 +33,31 @@ const createOrUpdateLocation = (userId, locationData) => __awaiter(void 0, void 
         speed: location.speed,
         heading: location.heading,
     });
-    // Calculate distance from this user to all other users
     const otherUsers = yield realTimeLocation_model_1.RealtimeLocationModel.find({
-        user: { $ne: userId },
+        user: { $nin: [userId, null] },
         hideLocation: false,
     });
     const distances = otherUsers.map((u) => ({
+        serialId: u.serialId,
         user: u.user,
+        latitude: u.latitude,
+        longitude: u.longitude,
         distanceMeters: (0, distance_1.getDistanceInMeters)(location.latitude, location.longitude, u.latitude, u.longitude),
     }));
-    console.log(distances);
-    // Emit distances only to this user
-    // io.to(userId.toString()).emit("usersDistance", distances);
     io.to(`user::${userId}`).emit("usersDistance", distances);
+    return location;
+});
+const toggleHideLocation = (userId) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!userId)
+        throw new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "Unauthorized");
+    const location = yield realTimeLocation_model_1.RealtimeLocationModel.findOne({ user: userId });
+    if (!location)
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Location not found");
+    location.hideLocation = !location.hideLocation; // toggle
+    yield location.save();
     return location;
 });
 exports.realtimeLocationServices = {
     createOrUpdateLocation,
+    toggleHideLocation,
 };

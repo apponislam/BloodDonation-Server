@@ -29,8 +29,16 @@ const locationSocketHandler = (io, socket) => {
         const otherUsers = yield realTimeLocation_model_1.RealtimeLocationModel.find({
             user: { $nin: [userId, null] },
             hideLocation: false,
-        });
-        // console.log(otherUsers);
+        })
+            .populate({
+            path: "user",
+            select: "name email phone role profileImg",
+            populate: {
+                path: "profile",
+                select: "gender bloodGroup totalDonations lastDonationDate dateOfBirth",
+            },
+        })
+            .lean();
         // calculate distance from this user to all others
         const distances = otherUsers.map((u) => ({
             serialId: u.serialId,

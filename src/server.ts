@@ -17,7 +17,10 @@ async function main() {
 
         createSuperAdmin();
 
-        server.listen(config.port, () => {
+        // server.listen(Number(config.port), config.ip || "0.0.0.0", () => {
+        //     console.log(`✅ App listening on port ${config.port}`);
+        // });
+        server.listen(Number(config.port), () => {
             console.log(`✅ App listening on port ${config.port}`);
         });
     } catch (err) {

@@ -26,7 +26,10 @@ function main() {
             server = http_1.default.createServer(app_1.default);
             (0, socketHelper_1.initSocket)(server);
             (0, createSuperAdmin_1.default)();
-            server.listen(config_1.default.port, () => {
+            // server.listen(Number(config.port), config.ip || "0.0.0.0", () => {
+            //     console.log(`✅ App listening on port ${config.port}`);
+            // });
+            server.listen(Number(config_1.default.port), () => {
                 console.log(`✅ App listening on port ${config_1.default.port}`);
             });
         }
